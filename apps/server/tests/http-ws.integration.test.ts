@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
 import type { ServerEvent } from '@apb/shared';
+import { ROOM_CODE_LENGTH, ROOM_CODE_PATTERN } from '@apb/shared';
 import { startTestServer, type TestHarness } from '../src/test/test-server.js';
+
+const UNKNOWN_ROOM_CODE = 'X'.repeat(ROOM_CODE_LENGTH);
 
 describe('HTTP + WebSocket integration', () => {
   let h: TestHarness;
@@ -16,7 +19,8 @@ describe('HTTP + WebSocket integration', () => {
     const create = await fetch(`${h.baseUrl}/api/rooms`, { method: 'POST' });
     expect(create.status).toBe(200);
     const { code } = (await create.json()) as { code: string };
-    expect(code).toMatch(/^[A-Z2-9]{6}$/);
+    expect(code).toHaveLength(ROOM_CODE_LENGTH);
+    expect(ROOM_CODE_PATTERN.test(code)).toBe(true);
 
     const meta = await fetch(`${h.baseUrl}/api/rooms/${code}`);
     expect(meta.status).toBe(200);
@@ -31,7 +35,7 @@ describe('HTTP + WebSocket integration', () => {
   });
 
   it('returns 404 for unknown room', async () => {
-    const r = await fetch(`${h.baseUrl}/api/rooms/XXXXXX`);
+    const r = await fetch(`${h.baseUrl}/api/rooms/${UNKNOWN_ROOM_CODE}`);
     expect(r.status).toBe(404);
   });
 
@@ -131,7 +135,7 @@ describe('HTTP + WebSocket integration', () => {
   });
 
   it('rejects WebSocket upgrade for unknown room', async () => {
-    const ws = new WebSocket(h.wsUrl('XXXXXX'));
+    const ws = new WebSocket(h.wsUrl(UNKNOWN_ROOM_CODE));
     await expect(
       new Promise<void>((resolve, reject) => {
         ws.once('open', () => reject(new Error('should not open')));

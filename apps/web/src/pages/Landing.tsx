@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
+import { ROOM_CODE_LENGTH } from '@apb/shared';
 import { createRoom, getRoom } from '../api.js';
 
 const LAST_ROOM_KEY = 'apb:last-room-code';
@@ -71,13 +72,13 @@ export function Landing() {
         <input
           value={code}
           onChange={(e) => setCode(e.target.value)}
-          placeholder="ROOM C"
-          maxLength={6}
+          placeholder="ROOM CODE"
+          maxLength={ROOM_CODE_LENGTH}
           className="flex-1 rounded-lg border border-ink-200 bg-white px-3 py-3 font-mono text-base uppercase tracking-[0.3em] focus:border-ink-400 focus:outline-none"
         />
         <button
           type="submit"
-          disabled={busy || code.length !== 6}
+          disabled={busy || code.length !== ROOM_CODE_LENGTH}
           className="rounded-lg border border-ink-200 bg-white px-4 text-sm font-medium hover:bg-ink-100 disabled:opacity-60"
         >
           Join

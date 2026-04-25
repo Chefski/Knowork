@@ -19,7 +19,7 @@ This project is intended to be self-hosted. Treat the room code as the only secr
 The following are **not** considered vulnerabilities for v0:
 
 - Lack of native SSO/OIDC (use a reverse proxy)
-- Room enumeration via brute-forcing 6-character codes (mitigated by per-IP rate limits; documented as a known trait)
+- Room enumeration via brute-forcing room codes (codes are 10 characters from a 32-symbol base32 alphabet — ~10^15 combinations — and writes are per-IP rate limited)
 - A self-hoster running the service on the public internet without TLS (the operator is responsible for terminating TLS)
 
 These may be revisited in future versions.

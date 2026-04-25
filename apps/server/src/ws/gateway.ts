@@ -3,12 +3,13 @@ import type { Duplex } from 'node:stream';
 import { nanoid } from 'nanoid';
 import { WebSocketServer, type WebSocket } from 'ws';
 import type { ClientMessage, ServerEvent } from '@apb/shared';
+import { ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH } from '@apb/shared';
 import type { Repository } from '../db/repository.js';
 import type { RoomRegistry } from '../registry/registry.js';
 import type { Logger } from '../logger.js';
 import type { AppConfig } from '../config.js';
 
-const ROOM_PATH_RE = /^\/ws\/([ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6})$/;
+const ROOM_PATH_RE = new RegExp(`^/ws/([${ROOM_CODE_ALPHABET}]{${ROOM_CODE_LENGTH}})$`);
 const HEARTBEAT_INTERVAL_MS = 20_000;
 
 export interface GatewayDeps {

@@ -1,12 +1,10 @@
 import { randomBytes } from 'node:crypto';
-import { ROOM_CODE_ALPHABET } from '@apb/shared';
-
-const CODE_LEN = 6;
+import { ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH } from '@apb/shared';
 
 export function generateRoomCode(): string {
-  const bytes = randomBytes(CODE_LEN);
+  const bytes = randomBytes(ROOM_CODE_LENGTH);
   let out = '';
-  for (let i = 0; i < CODE_LEN; i++) {
+  for (let i = 0; i < ROOM_CODE_LENGTH; i++) {
     out += ROOM_CODE_ALPHABET[bytes[i]! % ROOM_CODE_ALPHABET.length];
   }
   return out;

@@ -28,7 +28,7 @@ pnpm dev
 - Web UI: `http://localhost:5173`
 - MCP endpoint: `http://localhost:8787/mcp`
 
-Open the UI, click **Create new room**, copy the 6-character code.
+Open the UI, click **Create new room**, copy the 10-character code.
 
 ## MCP setup
 

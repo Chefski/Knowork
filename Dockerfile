@@ -41,7 +41,7 @@ COPY --from=builder /app/apps/server/dist apps/server/dist
 RUN pnpm install --filter @apb/server --prod --frozen-lockfile=false \
   && pnpm store prune
 
-VOLUME ["/data"]
+RUN mkdir -p /data
 EXPOSE 8787
 
 ENTRYPOINT ["/sbin/tini", "--"]
