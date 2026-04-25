@@ -11,6 +11,7 @@ import { corsMiddleware } from './http/middleware.js';
 import { serveStatic } from './http/static.js';
 import { buildMcpServer } from './mcp/server.js';
 import { buildMcpHandler } from './mcp/transport.js';
+import { InMemoryEventStore } from './mcp/event-store.js';
 import { RateLimiter } from './util/rate-limit.js';
 import { clientIp } from './http/middleware.js';
 import type { IncomingMessage } from 'node:http';
@@ -36,16 +37,32 @@ export function buildApp(opts: BuildAppOptions): BuiltApp {
   const registry = new RoomRegistry({
     repository,
     expiryMs: cfg.heartbeatExpiryMs,
+    sessionMaxAgeMs: cfg.sessionMaxAgeMs,
+    disconnectGraceMs: cfg.disconnectGraceMs,
     sweepIntervalMs: cfg.sweepIntervalMs,
   });
 
   const writeRateLimiter = new RateLimiter(cfg.rateLimitWritesPerMinute, 60_000);
+
+  // Single shared store across all sessions; SDK keys events by streamId, which
+  // is unique per (session, SSE stream) tuple internally.
+  const eventStore = new InMemoryEventStore({ bufferPerStream: cfg.sseReplayBufferSize });
 
   const mcpHandler = buildMcpHandler({
     createServer: () => buildMcpServer({ repo: repository, registry, logger }),
     logger,
     writeRateLimiter,
     ipFromReq: ipFromIncomingMessage,
+    eventStore,
+    onSessionStarted: (id) =>
+      logger.info({ event: 'mcp_session_started', session_id: id }, 'mcp session started'),
+    onSessionClosed: (id) => {
+      logger.info({ event: 'mcp_session_closed', session_id: id }, 'mcp session closed');
+      registry.markSessionDisconnected(id);
+    },
+    onSessionResumed: (id) => {
+      if (registry.isSessionDisconnected(id)) registry.resumeSession(id);
+    },
   });
 
   const hono = new Hono();

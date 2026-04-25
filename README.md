@@ -30,9 +30,19 @@ pnpm dev
 
 Open the UI, click **Create new room**, copy the 10-character code.
 
-## MCP setup
+## Connect your coding agent
 
-Add Knowork to your coding agent's MCP configuration.
+```bash
+npx knowork connect <ROOM-CODE>
+```
+
+This detects your agent (Claude Code / Codex CLI / Cursor) and writes the right config. Then **restart your agent** to pick it up.
+
+Self-hosted? Pass `--server <url>` (e.g. `npx knowork connect <ROOM-CODE> --server https://knowork.example.com`). To revert, run `npx knowork disconnect`.
+
+Prefer to wire it manually? See [Manual setup](#manual-setup) below.
+
+## Manual setup
 
 **Claude Code** (`~/.claude/mcp.json` or per-project `.mcp.json`):
 
@@ -67,7 +77,29 @@ url = "http://localhost:8787/mcp"
 }
 ```
 
-In your agent's instructions or system prompt, tell it to call `check_overlap` before non-trivial work, then `start_work`, periodic `heartbeat` (every 30s while working), and `complete_work` when done. The room code is passed as a tool argument.
+After wiring the config, paste the protocol paragraph from this repo's [`CLAUDE.md`](./CLAUDE.md) into your agent's instructions or system prompt so it knows when to call `check_overlap`, `start_work`, and `complete_work`. The room code is passed as a tool argument.
+
+## MCP tools
+
+| Tool             | Purpose                                                                                  |
+| ---------------- | ---------------------------------------------------------------------------------------- |
+| `check_overlap`  | Read-only — find active work in the room that overlaps with the caller (repo / branch / files / intent keywords). Call before `start_work`. |
+| `start_work`     | Register an active entry. Returns a `work_id`. The entry stays alive automatically while the calling MCP session is connected. |
+| `complete_work`  | Mark the entry shipped (or abandoned) and persist a summary. |
+| `heartbeat`      | **Deprecated** (kept for legacy clients on the stateless transport). Refreshes `last_seen`. New agents do not need to call this — presence is automatic while the MCP session is open. |
+| `list_active`    | Read-only — list every active entry in the room. |
+
+## CLI flags
+
+- `connect <ROOM-CODE>` — wire up agent
+- `disconnect` — remove what `connect` added
+- `--dry-run` — print planned diffs, write nothing
+- `--server <url>` — override server URL (default: `$KNOWORK_SERVER` or `https://knowork.app`)
+- `--password <pw>` — exchange password for room token, embed as Bearer
+- `--global` — write to user-scope (`~/.claude/...`) instead of project
+- `--project` — force project-scope
+- `--agent <name>` — force adapter (`claude-code` | `codex-cli` | `cursor` | `manual`)
+- `--allow-token-in-repo` — permit writing the room token into a tracked file
 
 ## Environment variables
 
@@ -80,6 +112,19 @@ In your agent's instructions or system prompt, tell it to call `check_overlap` b
 | `HISTORY_LIMIT`    | `100`                    | Recently-shipped entries kept per room             |
 | `RATE_LIMIT_ROOMS_PER_HOUR` | `10`            | Room creations per IP per hour                     |
 | `RATE_LIMIT_WRITES_PER_MIN` | `60`            | Write tool calls per IP per room per minute        |
+| `DISCONNECT_GRACE_MS`       | `30000`         | Window after MCP session close during which entries can resume on reconnect with the same session ID before they finalize as `session_closed` |
+| `SESSION_MAX_AGE_MS`        | `86400000`      | Hard cap (default 24h) on any active entry's age, regardless of session connectivity. Backstop against zombie sessions |
+| `HEARTBEAT_EXPIRY_MS`       | `90000`         | Legacy stateless-fallback only — wall-clock window for entries created without an MCP session. No effect on session-bound entries |
+| `SWEEP_INTERVAL_MS`         | `15000`         | How often the registry runs its sweep (max-age + legacy heartbeat) |
+| `SSE_REPLAY_BUFFER_SIZE`    | `1024`          | Per-stream cap on SSE events retained for `Last-Event-ID` resumption. Bumps memory roughly linearly with the number of concurrent sessions |
+
+## Deployment behind a load balancer
+
+Each agent's MCP session is server-managed in-process: the `StreamableHTTPServerTransport` lives in the Node process that handled the `initialize` request, and presence is derived from that session's lifetime. If you put Knowork behind a load balancer with multiple instances, you must enable **sticky routing on the `mcp-session-id` request header** so subsequent calls (and the bidirectional SSE stream) land on the same instance. Without sticky routing, a routed-elsewhere call falls through to the legacy stateless path and the session-driven presence guarantees no longer apply.
+
+The same constraint applies to the SSE replay buffer that backs `Last-Event-ID` resumption: it lives in-memory in the process that opened the session. A reconnect routed to a different instance won't find the buffered events. Sticky routing on `mcp-session-id` covers both. If you ever need true cross-instance resumption, swap the in-memory `EventStore` (`apps/server/src/mcp/event-store.ts`) for a shared backend (e.g. a Redis stream keyed by `streamId`).
+
+For single-instance deployments (Railway-style, the default), no extra configuration is needed.
 
 ## License
 

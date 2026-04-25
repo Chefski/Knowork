@@ -1,0 +1,44 @@
+{
+  "name": "knowork",
+  "version": "0.1.0",
+  "description": "One-command Knowork onboarding: connect your coding agent to a Knowork room.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "knowork": "./dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "pnpm --filter @apb/shared build && pnpm --filter knowork build && pnpm --filter knowork test",
+    "release": "pnpm prepublishOnly && pnpm publish --access public --no-git-checks"
+  },
+  "dependencies": {
+    "@apb/shared": "workspace:*",
+    "commander": "^12.1.0",
+    "consola": "^3.2.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "vitest": "^2.1.8"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

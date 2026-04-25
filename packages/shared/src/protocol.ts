@@ -3,7 +3,12 @@ export interface AgentIdentity {
   tool: string;
 }
 
-export type CompletionReason = 'completed' | 'expired' | 'expired_then_completed';
+export type CompletionReason =
+  | 'completed'
+  | 'expired'
+  | 'expired_then_completed'
+  | 'session_closed'
+  | 'session_max_age';
 
 export interface ActiveEntry {
   work_id: string;
@@ -15,6 +20,7 @@ export interface ActiveEntry {
   files: string[];
   started_at: number;
   last_seen: number;
+  disconnected_at?: number | null;
 }
 
 export interface CompletedEntry {
@@ -38,17 +44,33 @@ export interface SnapshotPayload {
   recently_shipped: CompletedEntry[];
 }
 
+export type WorkExpiredReason = 'session_closed' | 'session_max_age' | 'heartbeat_missed';
+
 export type ServerEvent =
   | { type: 'snapshot'; room: string; data: SnapshotPayload }
   | { type: 'work_started'; room: string; entry: ActiveEntry }
   | { type: 'work_heartbeat'; room: string; work_id: string; last_seen: number }
+  | {
+      type: 'work_session_disconnected';
+      room: string;
+      work_id: string;
+      entry: ActiveEntry;
+      disconnected_at: number;
+    }
+  | {
+      type: 'work_session_resumed';
+      room: string;
+      work_id: string;
+      entry: ActiveEntry;
+      resumed_at: number;
+    }
   | { type: 'work_completed'; room: string; work_id: string; entry: CompletedEntry }
   | {
       type: 'work_expired';
       room: string;
       work_id: string;
       entry: CompletedEntry;
-      reason: 'heartbeat_missed';
+      reason: WorkExpiredReason;
     }
   | { type: 'pong'; t: number };
 

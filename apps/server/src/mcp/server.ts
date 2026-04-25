@@ -3,6 +3,7 @@ import {
   CheckOverlapInputSchema,
   CompleteWorkInputSchema,
   HeartbeatInputSchema,
+  KNOWORK_PROTOCOL_TEXT,
   ListActiveInputSchema,
   StartWorkInputSchema,
 } from '@apb/shared';
@@ -32,17 +33,20 @@ function toolErrorResult(err: ToolError) {
 export function buildMcpServer(deps: McpDeps): McpServer {
   const { repo, registry } = deps;
 
-  const server = new McpServer({
-    name: 'agent-presence-board',
-    version: '0.1.0',
-  });
+  const server = new McpServer(
+    {
+      name: 'agent-presence-board',
+      version: '0.1.0',
+    },
+    { instructions: KNOWORK_PROTOCOL_TEXT },
+  );
 
   server.registerTool(
     'check_overlap',
     {
       title: 'Check overlap with active work in this room',
       description:
-        'Returns active work entries in the room whose repo, branch, intent keywords, or files overlap with the caller. Advisory only — does not block start_work.',
+        'Call this BEFORE starting any non-trivial unit of work, with the room code, repo, intent, and any files you plan to touch. Returns active work entries whose repo, branch, intent keywords, or files overlap with the caller. Advisory only — does not block start_work, but if a teammate is already on it you should stop and tell the user.',
       inputSchema: CheckOverlapInputSchema.shape,
       annotations: { readOnlyHint: true, idempotentHint: true },
     },
@@ -75,10 +79,11 @@ export function buildMcpServer(deps: McpDeps): McpServer {
     'start_work',
     {
       title: 'Announce that this agent has started a unit of work',
-      description: 'Registers a new active entry in the room and returns a work_id.',
+      description:
+        'Call this AFTER `check_overlap` clears, when you actually begin a unit of work. Registers a new active entry in the room and returns a `work_id`. Presence is automatic while your MCP session is connected — you only need to call `complete_work` when you finish.',
       inputSchema: StartWorkInputSchema.shape,
     },
-    async (input) => {
+    async (input, extra) => {
       const room = repo.getRoom(input.room);
       if (!room) return toolErrorResult({ code: 'room_not_found', message: input.room });
       const state = registry.getOrCreate(input.room);
@@ -88,9 +93,15 @@ export function buildMcpServer(deps: McpDeps): McpServer {
         branch: input.branch ?? null,
         intent: input.intent,
         files: input.files ?? [],
+        sessionId: extra?.sessionId,
       });
       deps.logger.info(
-        { event: 'start_work', room: input.room, work_id: entry.work_id },
+        {
+          event: 'start_work',
+          room: input.room,
+          work_id: entry.work_id,
+          session_id: extra?.sessionId ?? null,
+        },
         'work started',
       );
       return {
@@ -103,8 +114,9 @@ export function buildMcpServer(deps: McpDeps): McpServer {
   server.registerTool(
     'heartbeat',
     {
-      title: 'Heartbeat an active work entry',
-      description: 'Updates last_seen for the given work_id so the entry does not expire.',
+      title: 'Heartbeat an active work entry (deprecated)',
+      description:
+        '(optional, deprecated — presence is automatic when connected) Updates `last_seen` for the given `work_id`. New agents do not need to call this; the server keeps your entry alive as long as your MCP session is connected. Retained for legacy clients on the stateless transport path.',
       inputSchema: HeartbeatInputSchema.shape,
     },
     async (input) => {
@@ -126,7 +138,8 @@ export function buildMcpServer(deps: McpDeps): McpServer {
     'complete_work',
     {
       title: 'Mark an active work entry complete',
-      description: 'Removes the entry from the active set and writes it to recently-shipped.',
+      description:
+        'Call this when you finish (or abandon) the unit of work you announced. Removes the entry from the active set and writes it to recently-shipped, with the optional `summary` shown to teammates.',
       inputSchema: CompleteWorkInputSchema.shape,
     },
     async (input) => {
@@ -155,7 +168,8 @@ export function buildMcpServer(deps: McpDeps): McpServer {
     'list_active',
     {
       title: 'List active work entries in a room',
-      description: 'Returns all currently active work entries.',
+      description:
+        'Optional read-only inspection — returns every currently active work entry in the room. Use when you want a full picture rather than just overlap with the caller.',
       inputSchema: ListActiveInputSchema.shape,
       annotations: { readOnlyHint: true, idempotentHint: true },
     },

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useRoomStore, type ViewMode } from '../store.js';
+import { ConnectAgent } from './ConnectAgent.js';
 
 export function Header({ code }: { code: string }) {
   const view = useRoomStore((s) => s.view);
@@ -8,6 +9,7 @@ export function Header({ code }: { code: string }) {
   const setSearch = useRoomStore((s) => s.setSearch);
   const conn = useRoomStore((s) => s.connection);
   const [copied, setCopied] = useState(false);
+  const [connectOpen, setConnectOpen] = useState(false);
 
   async function copyCode() {
     try {
@@ -30,6 +32,9 @@ export function Header({ code }: { code: string }) {
     }
   }
 
+  // Same origin as shareLink; the MCP server is mounted at /mcp on the same host.
+  const serverUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/mcp`;
+
   return (
     <header className="flex flex-wrap items-center gap-4 border-b border-ink-200 bg-white px-6 py-4">
       <div className="flex items-center gap-3">
@@ -49,6 +54,23 @@ export function Header({ code }: { code: string }) {
         >
           Share link
         </button>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setConnectOpen((v) => !v)}
+            aria-expanded={connectOpen}
+            className="rounded border border-ink-200 px-2 py-1 text-xs hover:bg-ink-100"
+          >
+            Connect agent
+          </button>
+          {connectOpen && (
+            <ConnectAgent
+              code={code}
+              serverUrl={serverUrl}
+              onClose={() => setConnectOpen(false)}
+            />
+          )}
+        </div>
         {copied && <span className="text-xs text-ink-400">copied</span>}
         <ConnectionBadge state={conn} />
       </div>

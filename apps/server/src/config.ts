@@ -30,8 +30,18 @@ export interface AppConfig {
   historyLimit: number;
   rateLimitRoomsPerHour: number;
   rateLimitWritesPerMinute: number;
+  // Wall-clock window for the legacy stateless heartbeat path. Session-bound entries
+  // are no longer governed by this — they live as long as the MCP session is open.
   heartbeatExpiryMs: number;
+  // Grace window after an MCP session closes during which its entries can resume on
+  // reconnect with the same session ID. After this, entries finalize as session_closed.
+  disconnectGraceMs: number;
+  // Hard wall-clock cap on any active entry, measured from started_at. Backstop only.
+  sessionMaxAgeMs: number;
   sweepIntervalMs: number;
+  // Per-stream cap on retained SSE events used for `Last-Event-ID` resumption
+  // by the streamable HTTP transport. Tunes the in-memory replay buffer.
+  sseReplayBufferSize: number;
   demoBanner: boolean;
   corsOrigin: string;
   isProduction: boolean;
@@ -56,7 +66,10 @@ export function loadConfig(): AppConfig {
     rateLimitRoomsPerHour: envInt('RATE_LIMIT_ROOMS_PER_HOUR', 10),
     rateLimitWritesPerMinute: envInt('RATE_LIMIT_WRITES_PER_MIN', 60),
     heartbeatExpiryMs: envInt('HEARTBEAT_EXPIRY_MS', 90_000),
+    disconnectGraceMs: envInt('DISCONNECT_GRACE_MS', 30_000),
+    sessionMaxAgeMs: envInt('SESSION_MAX_AGE_MS', 24 * 60 * 60 * 1000),
     sweepIntervalMs: envInt('SWEEP_INTERVAL_MS', 15_000),
+    sseReplayBufferSize: envInt('SSE_REPLAY_BUFFER_SIZE', 1024),
     demoBanner: envBool('DEMO_BANNER', false),
     corsOrigin: envStr('CORS_ORIGIN', 'http://localhost:5173'),
     isProduction: envStr('NODE_ENV', 'development') === 'production',
