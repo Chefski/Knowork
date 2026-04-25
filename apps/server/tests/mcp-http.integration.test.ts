@@ -10,6 +10,19 @@ import { buildMcpServer } from '../src/mcp/server.js';
 import { buildMcpHandler } from '../src/mcp/transport.js';
 import { startTestServer, type TestHarness } from '../src/test/test-server.js';
 
+function initBody(id: number) {
+  return {
+    jsonrpc: '2.0',
+    id,
+    method: 'initialize',
+    params: {
+      protocolVersion: '2025-03-26',
+      capabilities: {},
+      clientInfo: { name: 'test', version: '1.0' },
+    },
+  };
+}
+
 describe('MCP HTTP transport', () => {
   let h: TestHarness;
   beforeEach(async () => {
@@ -29,19 +42,6 @@ describe('MCP HTTP transport', () => {
       body: JSON.stringify(body),
     });
     return { status: res.status, text: await res.text() };
-  }
-
-  function initBody(id: number) {
-    return {
-      jsonrpc: '2.0',
-      id,
-      method: 'initialize',
-      params: {
-        protocolVersion: '2025-03-26',
-        capabilities: {},
-        clientInfo: { name: 'test', version: '1.0' },
-      },
-    };
   }
 
   it('responds 200 to two sequential initialize requests', async () => {

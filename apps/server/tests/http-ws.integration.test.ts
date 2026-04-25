@@ -144,8 +144,17 @@ describe('HTTP + WebSocket integration', () => {
 
 async function waitFor(pred: () => boolean, timeoutMs: number): Promise<void> {
   const start = Date.now();
-  while (!pred()) {
-    if (Date.now() - start > timeoutMs) throw new Error('waitFor timeout');
-    await new Promise((r) => setTimeout(r, 20));
-  }
+  return new Promise<void>((resolve, reject) => {
+    const interval = setInterval(() => {
+      if (pred()) {
+        clearInterval(interval);
+        resolve();
+        return;
+      }
+      if (Date.now() - start > timeoutMs) {
+        clearInterval(interval);
+        reject(new Error('waitFor timeout'));
+      }
+    }, 20);
+  });
 }
