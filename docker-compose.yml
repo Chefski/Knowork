@@ -1,0 +1,23 @@
+services:
+  apb:
+    image: ghcr.io/${APB_OWNER:-yourorg}/agent-presence-board:${APB_TAG:-latest}
+    # To build locally instead of pulling:
+    # build: .
+    container_name: agent-presence-board
+    restart: unless-stopped
+    ports:
+      - '${APB_PORT:-8787}:8787'
+    volumes:
+      - apb-data:/data
+    environment:
+      PORT: '8787'
+      DATA_DIR: /data
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8787}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      HISTORY_LIMIT: ${HISTORY_LIMIT:-100}
+      RATE_LIMIT_ROOMS_PER_HOUR: ${RATE_LIMIT_ROOMS_PER_HOUR:-10}
+      RATE_LIMIT_WRITES_PER_MIN: ${RATE_LIMIT_WRITES_PER_MIN:-60}
+      DEMO_BANNER: ${DEMO_BANNER:-false}
+
+volumes:
+  apb-data:

@@ -1,0 +1,39 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react", "unicorn"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn",
+    "perf": "warn"
+  },
+  "env": {
+    "browser": true,
+    "node": true,
+    "es2022": true
+  },
+  "rules": {
+    "no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+    "no-console": "off",
+    "react/react-in-jsx-scope": "off",
+    "react/jsx-uses-react": "off"
+  },
+  "ignorePatterns": [
+    "node_modules",
+    "dist",
+    "build",
+    "coverage",
+    "data",
+    "*.tsbuildinfo",
+    "pnpm-lock.yaml"
+  ],
+  "overrides": [
+    {
+      "files": ["apps/web/**/*.{ts,tsx}"],
+      "env": { "browser": true, "node": false }
+    },
+    {
+      "files": ["apps/server/**/*.ts", "packages/**/*.ts"],
+      "env": { "node": true, "browser": false }
+    }
+  ]
+}
