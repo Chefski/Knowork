@@ -17,7 +17,7 @@
     "lint:fix": "oxlint --fix",
     "test": "pnpm -r test",
     "format": "prettier --write .",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
