@@ -50,11 +50,11 @@ function writeRateLimitKeys(body: unknown, ip: string): string[] {
 
   for (const call of calls) {
     if (!call || typeof call !== 'object') continue;
-    const b = call as JsonRpcCallToolBody;
-    if (b.method !== 'tools/call') continue;
-    if (!WRITE_TOOLS.has(b.params?.name ?? '')) continue;
+    const { method, params } = call as JsonRpcCallToolBody;
+    if (method !== 'tools/call') continue;
+    if (!WRITE_TOOLS.has(params?.name ?? '')) continue;
 
-    const room = b.params?.arguments?.room;
+    const room = params?.arguments?.room;
     const roomKey = typeof room === 'string' && room.length > 0 ? room.toUpperCase() : 'unknown';
     keys.push(`mcp-write:${ip}:${roomKey}`);
   }
@@ -84,12 +84,12 @@ async function readBody(req: IncomingMessage): Promise<unknown> {
 
 function isInitializeBody(body: unknown): boolean {
   const calls = Array.isArray(body) ? body : [body];
-  for (const call of calls) {
-    if (call && typeof call === 'object' && (call as { method?: string }).method === 'initialize') {
-      return true;
-    }
-  }
-  return false;
+  return calls.some(
+    (call) =>
+      call !== null &&
+      typeof call === 'object' &&
+      (call as { method?: string }).method === 'initialize',
+  );
 }
 
 interface SessionEntry {
@@ -108,14 +108,14 @@ interface SessionEntry {
  * calls without an `mcp-session-id` header and without an `initialize` body
  * (preserving the old behavior).
  */
+function readSessionId(req: IncomingMessage): string | undefined {
+  const raw = req.headers['mcp-session-id'];
+  if (Array.isArray(raw)) return raw[0];
+  return raw;
+}
+
 export function buildMcpHandler(deps: McpHandlerDeps) {
   const sessions = new Map<string, SessionEntry>();
-
-  function readSessionId(req: IncomingMessage): string | undefined {
-    const raw = req.headers['mcp-session-id'];
-    if (Array.isArray(raw)) return raw[0];
-    return raw;
-  }
 
   async function dispatch(
     entry: SessionEntry,
@@ -214,6 +214,7 @@ export function buildMcpHandler(deps: McpHandlerDeps) {
       // Set onclose BEFORE server.connect so the SDK chains us into its own
       // teardown rather than overwriting it. The SDK calls server.close()
       // internally; calling it again here recurses through transport.close.
+      // eslint-disable-next-line unicorn/prefer-add-event-listener -- SDK contract uses property setter, not EventTarget
       transport.onclose = () => {
         const id = transport.sessionId;
         if (id) {

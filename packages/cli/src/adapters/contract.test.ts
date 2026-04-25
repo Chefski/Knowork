@@ -16,18 +16,12 @@ const ENTRY: McpEntry = {
 const ROOM_A = 'AAAAAAAAAA';
 const ROOM_B = 'BBBBBBBBBB';
 
-// Counts occurrences of the entry key in the produced config text. Different
-// adapters use different syntactic shapes (JSON `"knowork":` vs TOML
-// `name = "knowork"`), but every adapter we ship references the key by its
-// literal name somewhere — so a global count of `MCP_ENTRY_KEY` is a reliable
+// Different adapters use different syntactic shapes (JSON `"knowork":` vs TOML
+// `name = "knowork"`), but every adapter references the key by its literal
+// name somewhere — so a global count of `MCP_ENTRY_KEY` is a reliable
 // "is the entry duplicated?" signal across formats.
 function countEntryReferences(text: string): number {
-  // Use a regex with `g` flag built from the literal key. The key is a fixed
-  // identifier (`knowork`) so escaping isn't needed in practice, but we still
-  // build it dynamically in case it ever changes.
-  const escaped = MCP_ENTRY_KEY.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const matches = text.match(new RegExp(escaped, 'g')) ?? [];
-  return matches.length;
+  return text.split(MCP_ENTRY_KEY).length - 1;
 }
 
 describe.each(ALL_ADAPTERS.map((a) => [a.id, a] as const))(
@@ -55,12 +49,8 @@ describe.each(ALL_ADAPTERS.map((a) => [a.id, a] as const))(
       const second = adapter.applyMcpEntry(first, ENTRY, { roomCode: ROOM_B });
       expect(second).toContain(ROOM_B);
       expect(second).not.toContain(ROOM_A);
-      // Exactly one entry, no duplicates. The manual adapter's output is a
-      // standalone snippet — `null` input and a non-null input both produce a
-      // single entry — so this assertion holds across formats.
-      const firstCount = countEntryReferences(first);
-      const secondCount = countEntryReferences(second);
-      expect(secondCount).toBe(firstCount);
+      // Re-applying must update in place, not append a duplicate entry.
+      expect(countEntryReferences(second)).toBe(countEntryReferences(first));
     });
 
     it('removeMcpEntry returns a string that no longer contains the room code', () => {
@@ -72,16 +62,12 @@ describe.each(ALL_ADAPTERS.map((a) => [a.id, a] as const))(
 
     if (adapter.supportsProjectScope) {
       it('configPath returns distinct absolute paths for project vs global', () => {
-        // The manual adapter returns a sentinel string (not an absolute path);
-        // skip the absolute-path assertion for it but still require distinct
-        // values are well-defined and deterministic across the two scopes
-        // OR identical (manual prints to stdout regardless of scope).
         const project = adapter.configPath('project');
         const global = adapter.configPath('global');
         expect(typeof project).toBe('string');
         expect(typeof global).toBe('string');
         if (adapter.id === 'manual') {
-          // Manual prints to stdout regardless of scope — same sentinel.
+          // Manual prints to stdout regardless of scope — same sentinel, not an absolute path.
           expect(project).toBe(global);
         } else {
           expect(project).not.toBe(global);
@@ -92,7 +78,6 @@ describe.each(ALL_ADAPTERS.map((a) => [a.id, a] as const))(
     } else {
       it('configPath("project") throws when project scope is unsupported', () => {
         expect(() => adapter.configPath('project')).toThrow();
-        // Global must still resolve to an absolute path.
         const global = adapter.configPath('global');
         expect(isAbsolute(global)).toBe(true);
       });

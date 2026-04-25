@@ -98,7 +98,6 @@ describe('MCP stateful session presence', () => {
     const workId = await startWork(sessionId, roomCode);
     expect(events.some((e) => e.type === 'work_started')).toBe(true);
 
-    // Terminate the session.
     const del = await fetch(`${h.baseUrl}/mcp`, {
       method: 'DELETE',
       headers: { 'mcp-session-id': sessionId },
@@ -131,19 +130,16 @@ describe('MCP stateful session presence', () => {
     const events = captureEvents(roomCode);
     const workId = await startWork(sessionId, roomCode);
 
-    // Simulate a transient close.
     h.built.registry.markSessionDisconnected(sessionId);
     expect(
       events.some((e) => e.type === 'work_session_disconnected' && e.work_id === workId),
     ).toBe(true);
 
-    // Reconnect inside grace.
     h.built.registry.resumeSession(sessionId);
     expect(
       events.some((e) => e.type === 'work_session_resumed' && e.work_id === workId),
     ).toBe(true);
 
-    // Wait past grace and confirm no expiry was emitted.
     await new Promise((r) => setTimeout(r, 200));
     const expired = events.find((e) => e.type === 'work_expired' && e.work_id === workId);
     expect(expired).toBeUndefined();

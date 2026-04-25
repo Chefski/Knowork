@@ -224,7 +224,7 @@ export function applyMcpEntryToml(
   // trailing newline.
   let prefix = existing;
   if (!prefix.endsWith('\n')) prefix += '\n';
-  if (!prefix.endsWith('\n\n') && prefix.length > 0) prefix += '\n';
+  if (!prefix.endsWith('\n\n')) prefix += '\n';
   return prefix + newLines.join('\n') + '\n';
 }
 

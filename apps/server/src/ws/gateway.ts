@@ -69,11 +69,10 @@ export class WebSocketGateway {
 
   private onConnection(ws: WebSocket, roomCode: string): void {
     const room = this.deps.registry.getOrCreate(roomCode);
-    const subId = nanoid(8);
-    let alive = true;
+    const tagged = ws as WebSocket & { __apb_alive?: boolean };
 
     const sub = {
-      id: subId,
+      id: nanoid(8),
       send: (event: ServerEvent) => {
         if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(event));
       },
@@ -88,18 +87,19 @@ export class WebSocketGateway {
 
     room.addSubscriber(sub);
 
-    const snapshot: ServerEvent = {
+    sub.send({
       type: 'snapshot',
       room: roomCode,
       data: {
         active: room.listActive(),
         recently_shipped: this.deps.repo.listRecentlyShipped(roomCode, this.deps.cfg.historyLimit),
       },
-    };
-    sub.send(snapshot);
+    });
 
+    // Per-connection liveness flag used by the global heartbeat sweep
+    tagged.__apb_alive = true;
     ws.on('pong', () => {
-      alive = true;
+      tagged.__apb_alive = true;
     });
 
     ws.on('message', (raw) => {
@@ -112,7 +112,6 @@ export class WebSocketGateway {
       if (msg && msg.type === 'ping') {
         sub.send({ type: 'pong', t: Date.now() });
       }
-      // 'subscribe' is a no-op; everything else ignored silently.
     });
 
     ws.on('close', () => {
@@ -122,13 +121,6 @@ export class WebSocketGateway {
     ws.on('error', () => {
       room.removeSubscriber(sub);
     });
-
-    // Per-connection liveness flag used by the global heartbeat sweep
-    (ws as WebSocket & { __apb_alive?: boolean }).__apb_alive = true;
-    ws.on('pong', () => {
-      (ws as WebSocket & { __apb_alive?: boolean }).__apb_alive = true;
-    });
-    void alive;
   }
 
   private startHeartbeat(): void {

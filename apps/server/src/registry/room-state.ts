@@ -203,7 +203,7 @@ export class RoomState {
     for (const workId of owned) {
       const entry = this.active.get(workId);
       if (!entry) continue;
-      if (entry.disconnected_at) continue; // already flagged
+      if (entry.disconnected_at) continue;
       entry.disconnected_at = t;
       this.broadcast({
         type: 'work_session_disconnected',
@@ -252,8 +252,7 @@ export class RoomState {
     const owned = this.sessionEntries.get(sessionId);
     if (!owned || owned.size === 0) return [];
     const expired: CompletedEntry[] = [];
-    const stillOwned = Array.from(owned);
-    for (const workId of stillOwned) {
+    for (const workId of Array.from(owned)) {
       const entry = this.active.get(workId);
       if (!entry) continue;
       // Skip if the entry was reconnected (resume cleared the flag) or already
@@ -292,7 +291,8 @@ export class RoomState {
     const cutoff = this.now() - maxAgeMs;
     const expired: CompletedEntry[] = [];
     for (const [workId, entry] of this.active) {
-      if (this.entrySessions.has(workId)) continue; // session-bound; skip
+      // Session-bound entries: liveness is governed by the connection, not last_seen.
+      if (this.entrySessions.has(workId)) continue;
       if (entry.last_seen < cutoff) {
         const finalized = this.finalizeEntry(workId, entry, 'heartbeat_missed');
         if (finalized) expired.push(finalized);
@@ -364,8 +364,7 @@ export class RoomState {
   }
 
   hasSession(sessionId: string): boolean {
-    const owned = this.sessionEntries.get(sessionId);
-    return !!owned && owned.size > 0;
+    return (this.sessionEntries.get(sessionId)?.size ?? 0) > 0;
   }
 
   checkOverlap(args: CheckOverlapArgs): OverlapMatch[] {
@@ -375,7 +374,9 @@ export class RoomState {
     const intentTokens = args.intent ? tokenize(args.intent) : new Set<string>();
     const fileTokens = new Set<string>();
     const filesLower = (args.files ?? []).map((f) => f.toLowerCase());
-    for (const f of filesLower) for (const t of tokenizePath(f)) fileTokens.add(t);
+    for (const f of filesLower) {
+      for (const t of tokenizePath(f)) fileTokens.add(t);
+    }
 
     for (const entry of this.active.values()) {
       if (entry.repo.toLowerCase() !== repoLower) continue;
@@ -419,7 +420,9 @@ export class RoomState {
       if (intentTokens.size > 0) {
         const entryTokens = tokenize(entry.intent);
         const shared: string[] = [];
-        for (const t of intentTokens) if (entryTokens.has(t)) shared.push(t);
+        for (const t of intentTokens) {
+          if (entryTokens.has(t)) shared.push(t);
+        }
         if (shared.length >= 2) {
           reasons.push(`shared intent keywords: ${shared.slice(0, 5).join(', ')}`);
         }

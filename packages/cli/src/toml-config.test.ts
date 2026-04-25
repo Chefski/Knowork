@@ -68,7 +68,6 @@ describe('applyMcpEntryToml', () => {
     expect(out).toContain('https://knowork.app/mcp');
     expect(out).not.toContain('https://stale.example.com/mcp');
     expect(out).not.toContain('OLDROOMCDE');
-    // Exactly one knowork header
     const matches = out.match(/name = "knowork"/g) ?? [];
     expect(matches).toHaveLength(1);
   });
@@ -177,7 +176,6 @@ describe('removeMcpEntryToml', () => {
     ].join('\n');
     const applied = applyMcpEntryToml(original, entry, { roomCode: ROOM });
     const removed = removeMcpEntryToml(applied);
-    // Compare ignoring trailing whitespace differences.
     expect(removed.replace(/\s+$/g, '')).toBe(original.replace(/\s+$/g, ''));
   });
 

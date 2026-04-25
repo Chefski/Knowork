@@ -32,7 +32,8 @@ export function serveStatic(rootDir: string): MiddlewareHandler {
     }
 
     const safe = normalize(requested).replace(/^(\.\.[/\\])+/, '');
-    const candidate = resolve(root, '.' + (safe === '/' ? '/index.html' : safe));
+    const relative = safe === '/' ? '/index.html' : safe;
+    const candidate = resolve(root, '.' + relative);
     if (!candidate.startsWith(root)) {
       return c.text('forbidden', 403);
     }

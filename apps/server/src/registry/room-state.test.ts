@@ -351,7 +351,6 @@ describe('RoomState', () => {
       const expired = state.expireStale(90_000);
       expect(expired).toHaveLength(1);
       expect(expired[0]!.agent_identity.name).toBe('legacy');
-      // Session-bound entry survives
       expect(state.listActive()).toHaveLength(1);
       expect(state.listActive()[0]!.agent_identity.name).toBe('session');
     });

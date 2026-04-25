@@ -32,7 +32,8 @@ export async function disconnect(opts: DisconnectOptions): Promise<void> {
     writeRulesFile: opts.writeRulesFile,
   });
 
-  if (plans.every((p) => p.before === p.after)) {
+  const changed = plans.filter((p) => p.before !== p.after);
+  if (changed.length === 0) {
     // Nothing on disk references knowork. Spec calls this a no-op exiting zero.
     consola.info('Nothing to remove — knowork is not configured for this agent here.');
     return;
@@ -45,7 +46,7 @@ export async function disconnect(opts: DisconnectOptions): Promise<void> {
 
   applyPlannedWrites(plans);
   consola.success(`Disconnected from ${adapter.displayName} (${scope} scope).`);
-  for (const p of plans.filter((x) => x.before !== x.after)) {
+  for (const p of changed) {
     consola.info(`  cleaned ${p.path}`);
   }
 }
@@ -69,16 +70,14 @@ export function computeDisconnectPlans(input: DisconnectPlanInput): PlannedWrite
     }
   }
 
-  if (writeRulesFile) {
-    const rulesRoot = scope === 'project' ? gitRepoRoot() ?? process.cwd() : null;
-    if (rulesRoot !== null) {
-      for (const name of RULES_FILES) {
-        const path = `${rulesRoot}/${name}`;
-        const before = readIfExists(path);
-        if (before !== null) {
-          const after = removeRulesBlock(before);
-          plans.push({ path, before, after, reason: `remove rules: ${name}` });
-        }
+  if (writeRulesFile && scope === 'project') {
+    const rulesRoot = gitRepoRoot() ?? process.cwd();
+    for (const name of RULES_FILES) {
+      const path = `${rulesRoot}/${name}`;
+      const before = readIfExists(path);
+      if (before !== null) {
+        const after = removeRulesBlock(before);
+        plans.push({ path, before, after, reason: `remove rules: ${name}` });
       }
     }
   }

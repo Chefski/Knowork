@@ -95,7 +95,6 @@ describe('MCP HTTP transport', () => {
       ipFromReq: () => '127.0.0.1',
     });
 
-    // Stand up a tiny http server bound to this handler.
     const { createServer: httpCreateServer } = await import('node:http');
     const srv = httpCreateServer((req, res) => void handler(req, res));
     await new Promise<void>((resolve) => srv.listen(0, '127.0.0.1', resolve));

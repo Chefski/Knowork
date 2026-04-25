@@ -36,9 +36,7 @@ export const codexCliAdapter: AgentAdapter = {
   async detect(): Promise<DetectionResult> {
     const signals: string[] = [];
     if (process.env.CODEX_CLI) signals.push('CODEX_CLI set');
-    if (existsSync(join(homedir(), '.codex'))) {
-      signals.push('~/.codex/ exists');
-    }
+    if (existsSync(join(homedir(), '.codex'))) signals.push('~/.codex/ exists');
     return { present: signals.length > 0, signals };
   },
 };

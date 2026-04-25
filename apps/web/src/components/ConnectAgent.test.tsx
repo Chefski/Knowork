@@ -124,18 +124,15 @@ X-Room-Code = "${CODE}"
     const NEW_SERVER = 'https://other.example/mcp';
     rerender(<ConnectAgent code={NEW_CODE} serverUrl={NEW_SERVER} />);
 
-    // Primary command updates in the displayed text.
     expect(screen.getByTestId('primary-command').textContent).toBe(
       `npx knowork connect ${NEW_CODE} --server ${NEW_SERVER}`,
     );
 
-    // Clipboard payload reflects the new props.
     fireEvent.click(screen.getByTestId('copy-primary'));
     expect(writeText).toHaveBeenLastCalledWith(
       `npx knowork connect ${NEW_CODE} --server ${NEW_SERVER}`,
     );
 
-    // Agent snippet also reflects new props.
     fireEvent.click(screen.getByTestId('agent-claude-code'));
     fireEvent.click(screen.getByTestId('copy-snippet'));
     expect(writeText).toHaveBeenLastCalledWith(buildClaudeCodeSnippet(NEW_CODE, NEW_SERVER));

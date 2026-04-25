@@ -38,12 +38,6 @@ export interface RecordCompletedInput {
   summary: string | null;
 }
 
-interface RawRoomRow {
-  code: string;
-  created_at: number;
-  last_active_at: number;
-}
-
 interface RawCompletedRow {
   id: number;
   room_code: string;
@@ -111,7 +105,7 @@ export class Repository {
   }
 
   getRoom(code: string): RoomRow | null {
-    const row = this.selectRoom.get(code) as RawRoomRow | undefined;
+    const row = this.selectRoom.get(code) as RoomRow | undefined;
     return row ?? null;
   }
 

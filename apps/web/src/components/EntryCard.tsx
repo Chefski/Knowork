@@ -3,16 +3,12 @@ import { relativeTime } from '../util/time.js';
 
 export function EntryCard({ entry, idle = false }: { entry: ActiveEntry; idle?: boolean }) {
   const disconnected = !!entry.disconnected_at;
+  let stateClass = 'border-ink-200 hover:border-ink-400';
+  if (disconnected) stateClass = 'border-ink-200 opacity-60 saturate-50';
+  else if (idle) stateClass = 'border-amber-200';
   return (
     <article
-      className={
-        'rounded-lg border bg-white p-3 text-sm transition ' +
-        (disconnected
-          ? 'border-ink-200 opacity-60 saturate-50'
-          : idle
-            ? 'border-amber-200'
-            : 'border-ink-200 hover:border-ink-400')
-      }
+      className={`rounded-lg border bg-white p-3 text-sm transition ${stateClass}`}
       data-testid="entry-card"
       data-disconnected={disconnected || undefined}
     >

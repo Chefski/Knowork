@@ -166,7 +166,6 @@ describe('computeDisconnectPlans', () => {
       const cwd = process.cwd();
       process.chdir(tmp);
       try {
-        // Seed a knowork-having .mcp.json then ensure removal plan touches it.
         writeFileSync(
           join(tmp, '.mcp.json'),
           JSON.stringify(

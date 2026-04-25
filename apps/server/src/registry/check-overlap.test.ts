@@ -8,13 +8,12 @@ const ROOM = 'OVERLP';
 
 describe('RoomState.checkOverlap', () => {
   let db: Db;
-  let repo: Repository;
   let state: RoomState;
 
   beforeEach(async () => {
     db = openDatabase(':memory:');
     runMigrations(db);
-    repo = new Repository(db);
+    const repo = new Repository(db);
     repo.createRoom(ROOM);
     state = new RoomState(ROOM, repo);
     await state.startWork({

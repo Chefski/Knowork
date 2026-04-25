@@ -7,13 +7,12 @@ import { Repository } from './db/repository.js';
 import { RoomRegistry } from './registry/registry.js';
 import type { Logger } from './logger.js';
 import { buildApiRouter } from './http/routes.js';
-import { corsMiddleware } from './http/middleware.js';
+import { clientIp, corsMiddleware } from './http/middleware.js';
 import { serveStatic } from './http/static.js';
 import { buildMcpServer } from './mcp/server.js';
 import { buildMcpHandler } from './mcp/transport.js';
 import { InMemoryEventStore } from './mcp/event-store.js';
 import { RateLimiter } from './util/rate-limit.js';
-import { clientIp } from './http/middleware.js';
 import type { IncomingMessage } from 'node:http';
 
 export interface BuildAppOptions {

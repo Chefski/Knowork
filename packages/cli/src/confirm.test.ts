@@ -236,12 +236,10 @@ describe('confirmDetection', () => {
       confirmDetection(outcome, {
         assumeYes: false,
         isTty: true,
-        // Three invalid inputs in a row exhausts the retry budget.
         stdin: lineStream('99', 'foo', '0'),
         stdout,
       }),
     ).rejects.toMatchObject({ name: 'CliError', message: expect.stringContaining('aborted') });
-    // Re-prompt shown at least twice (attempts 2 and 3 after the initial one).
     const promptMatches = stdout.text.match(/Pick one \[1-2\]/g) ?? [];
     expect(promptMatches.length).toBeGreaterThanOrEqual(3);
   });

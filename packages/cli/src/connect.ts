@@ -105,19 +105,22 @@ export function computeConnectPlans(input: ConnectPlanInput): PlannedWrite[] {
     });
   } else {
     const configPath = adapter.configPath(scope);
-    if (entry.token !== undefined && scope === 'project' && !allowTokenInRepo) {
-      // Only block when the file actually lives inside a git tree. The user
-      // may have a `--project` write target that they manage outside git
-      // (rare, but legal); in that case the token concern doesn't apply.
-      if (isPathInsideGitTree(configPath)) {
-        throw new CliError(
-          `Refusing to write the room token into a tracked-tree file: ${configPath}`,
-          {
-            remediation:
-              'Re-run with `--global` (write to user-scope) or `--allow-token-in-repo` to override.',
-          },
-        );
-      }
+    // Only block when the file actually lives inside a git tree. The user
+    // may have a `--project` write target that they manage outside git
+    // (rare, but legal); in that case the token concern doesn't apply.
+    if (
+      entry.token !== undefined &&
+      scope === 'project' &&
+      !allowTokenInRepo &&
+      isPathInsideGitTree(configPath)
+    ) {
+      throw new CliError(
+        `Refusing to write the room token into a tracked-tree file: ${configPath}`,
+        {
+          remediation:
+            'Re-run with `--global` (write to user-scope) or `--allow-token-in-repo` to override.',
+        },
+      );
     }
     const before = readIfExists(configPath);
     const after = adapter.applyMcpEntry(before, entry, { roomCode });
@@ -129,19 +132,16 @@ export function computeConnectPlans(input: ConnectPlanInput): PlannedWrite[] {
     });
   }
 
-  if (writeRulesFile) {
-    const rulesRoot = scope === 'project' ? gitRepoRoot() ?? process.cwd() : null;
-    if (rulesRoot === null) {
-      // Global scope outside a repo has no obvious rules-file location. Spec
-      // says to inform the user — we surface that in the summary.
-    } else {
-      const block = knoworkRulesBlock();
-      for (const name of RULES_FILES) {
-        const path = `${rulesRoot}/${name}`;
-        const before = readIfExists(path);
-        const after = applyRulesBlock(before, block);
-        plans.push({ path, before, after, reason: `rules: ${name}` });
-      }
+  // Global scope has no obvious rules-file location — we skip and surface
+  // that fact in the summary.
+  const rulesRoot = scope === 'project' ? gitRepoRoot() ?? process.cwd() : null;
+  if (writeRulesFile && rulesRoot !== null) {
+    const block = knoworkRulesBlock();
+    for (const name of RULES_FILES) {
+      const path = `${rulesRoot}/${name}`;
+      const before = readIfExists(path);
+      const after = applyRulesBlock(before, block);
+      plans.push({ path, before, after, reason: `rules: ${name}` });
     }
   }
 

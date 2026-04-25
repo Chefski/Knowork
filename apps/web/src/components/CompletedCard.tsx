@@ -8,12 +8,11 @@ export function CompletedCard({ entry }: { entry: CompletedEntry }) {
       <header className="flex items-center justify-between gap-2">
         <strong className="truncate font-medium">{entry.agent_identity.name}</strong>
         <span
-          className={
-            'rounded px-1.5 py-0.5 text-xs ' +
-            (kind === 'shipped'
+          className={`rounded px-1.5 py-0.5 text-xs ${
+            kind === 'shipped'
               ? 'bg-emerald-100 text-emerald-700'
-              : 'bg-amber-100 text-amber-700')
-          }
+              : 'bg-amber-100 text-amber-700'
+          }`}
         >
           {label}
         </span>

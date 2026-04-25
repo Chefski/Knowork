@@ -37,7 +37,7 @@ describe('applyMcpEntryJson', () => {
     expect(parsed.mcpServers.knowork.headers['X-Room-Code']).toBe(ROOM);
   });
 
-  it("does not touch unrelated mcpServers entries", () => {
+  it('does not touch unrelated mcpServers entries', () => {
     const existing = JSON.stringify(
       {
         mcpServers: {

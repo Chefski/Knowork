@@ -110,7 +110,6 @@ describe('RoomRegistry session lifecycle', () => {
     expect(timers).toHaveLength(0);
 
     expect(events.some((e) => e.type === 'work_session_resumed')).toBe(true);
-    // Firing remaining timers shouldn't expire anything (none scheduled after cancel).
     fireAll();
     expect(room.listActive()).toHaveLength(1);
   });

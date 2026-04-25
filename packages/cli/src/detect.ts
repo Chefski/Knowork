@@ -50,8 +50,8 @@ export async function detectAdapter(input: DetectInput = {}): Promise<DetectionO
 
   if (candidates.length === 0) return { kind: 'none' };
   if (candidates.length === 1) {
-    const only = candidates[0]!;
-    return { kind: 'single', adapter: only.adapter, signals: only.signals };
+    const { adapter, signals } = candidates[0]!;
+    return { kind: 'single', adapter, signals };
   }
   return { kind: 'ambiguous', candidates };
 }

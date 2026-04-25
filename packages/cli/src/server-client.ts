@@ -1,6 +1,5 @@
 import { CliError } from './errors.js';
 
-// Lightweight client for the Knowork server endpoints used during onboarding.
 // We deliberately avoid pulling in a heavyweight HTTP library — the CLI ships
 // with `npx`, so every transitive dep matters.
 
@@ -14,14 +13,13 @@ const DEFAULT_TIMEOUT_MS = 7_000;
 export class ServerClient {
   constructor(private readonly serverUrl: string) {}
 
-  // Server "base URL" — the operator may pass either the bare hostname
-  // (https://knowork.app) or the MCP endpoint (https://knowork.app/mcp).
-  // Strip a trailing /mcp so /api lookups hit the right path.
+  // The operator may pass either the bare hostname (https://knowork.app) or
+  // the MCP endpoint (https://knowork.app/mcp); strip a trailing /mcp so /api
+  // lookups hit the right path.
   private apiBase(): string {
     return this.serverUrl.replace(/\/mcp\/?$/, '').replace(/\/+$/, '');
   }
 
-  // Returns null when the room does not exist; throws CliError on transport errors.
   async fetchRoom(roomCode: string): Promise<RoomMetadata | null> {
     const url = `${this.apiBase()}/api/rooms/${encodeURIComponent(roomCode)}`;
     const res = await this.fetchWithTimeout(url, { method: 'GET' });
@@ -31,12 +29,10 @@ export class ServerClient {
         remediation: 'Verify the --server URL and that the server is reachable.',
       });
     }
-    const data = (await res.json()) as Partial<RoomMetadata> & { code?: string };
+    const data = (await res.json()) as Partial<RoomMetadata>;
     return { code: data.code ?? roomCode, protected: data.protected === true };
   }
 
-  // Exchanges a room password for a Bearer token via the existing endpoint.
-  // Returns the token; throws CliError with the server's error on rejection.
   async exchangePassword(roomCode: string, password: string): Promise<string> {
     const url = `${this.apiBase()}/api/rooms/${encodeURIComponent(roomCode)}/token`;
     const res = await this.fetchWithTimeout(url, {
