@@ -178,8 +178,22 @@ export function buildMcpHandler(deps: McpHandlerDeps) {
         }
         return;
       }
-      // Fall through: SDK will 404 on the unknown session id during handleRequest
-      // below in legacy stateless mode. This shouldn't normally happen.
+      // Reject unknown session IDs explicitly. Falling through to the legacy
+      // stateless block silently downgrades stale or misrouted clients: the
+      // SDK skips session validation entirely when sessionIdGenerator is
+      // undefined, so a tools/call would execute against a one-shot transport
+      // even though the client thinks it's session-bound. Match the SDK's
+      // wire format (404, JSON-RPC error -32001).
+      res.statusCode = 404;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(
+        JSON.stringify({
+          jsonrpc: '2.0',
+          error: { code: -32001, message: 'Session not found' },
+          id: null,
+        }),
+      );
+      return;
     }
 
     // Mint a fresh session on initialize.

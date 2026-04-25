@@ -209,6 +209,29 @@ describe('buildMcpHandler stateful session routing', () => {
     expect(onSessionClosed).toHaveBeenCalledWith(sessionId);
   });
 
+  it('unknown mcp-session-id returns 404 (no silent stateless fallthrough)', async () => {
+    // Regression for the silent-downgrade hazard: when a request arrives with
+    // an mcp-session-id we don't recognise, we must NOT fall through to the
+    // legacy stateless block — the SDK skips session validation entirely when
+    // sessionIdGenerator is undefined, so a tools/call would execute without
+    // the client realising its session was gone. Match the SDK's wire format
+    // (404, JSON-RPC error -32001 'Session not found').
+    const res = await fetch(`${baseUrl}/mcp`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json, text/event-stream',
+        'mcp-session-id': 'not-a-real-session-id',
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+    });
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { jsonrpc?: string; error?: { code?: number } };
+    expect(body.jsonrpc).toBe('2.0');
+    expect(body.error?.code).toBe(-32001);
+    expect(onSessionResumed).not.toHaveBeenCalled();
+  });
+
   it('after DELETE the session id is no longer routable (locks SDK DELETE→onclose contract)', async () => {
     // Pins the SDK invariant our disconnect-grace flow depends on: DELETE
     // must trigger transport.onclose (which clears the session from our map)

@@ -42,6 +42,10 @@ export interface AppConfig {
   // Per-stream cap on retained SSE events used for `Last-Event-ID` resumption
   // by the streamable HTTP transport. Tunes the in-memory replay buffer.
   sseReplayBufferSize: number;
+  // Hard cap on distinct streams retained by the in-memory replay buffer.
+  // The SDK mints a new streamId per POST that returns SSE, so without this
+  // cap memory grows with cumulative POST count on a long-running process.
+  sseReplayMaxStreams: number;
   demoBanner: boolean;
   corsOrigin: string;
   isProduction: boolean;
@@ -70,6 +74,7 @@ export function loadConfig(): AppConfig {
     sessionMaxAgeMs: envInt('SESSION_MAX_AGE_MS', 24 * 60 * 60 * 1000),
     sweepIntervalMs: envInt('SWEEP_INTERVAL_MS', 15_000),
     sseReplayBufferSize: envInt('SSE_REPLAY_BUFFER_SIZE', 1024),
+    sseReplayMaxStreams: envInt('SSE_REPLAY_MAX_STREAMS', 1024),
     demoBanner: envBool('DEMO_BANNER', false),
     corsOrigin: envStr('CORS_ORIGIN', 'http://localhost:5173'),
     isProduction: envStr('NODE_ENV', 'development') === 'production',

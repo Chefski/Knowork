@@ -13,6 +13,12 @@ interface StoredEvent {
 export interface InMemoryEventStoreOptions {
   /** Hard cap on events retained per stream. Older events are evicted on overflow. */
   bufferPerStream: number;
+  /** Hard cap on distinct streams retained. The least-recently-written stream
+   *  is evicted in full when this is exceeded. The SDK mints a fresh streamId
+   *  (`crypto.randomUUID()`) for every POST that returns SSE — without this
+   *  cap, `streams`/`index` grow with cumulative POST count rather than active
+   *  sessions on a long-running process. */
+  maxStreams: number;
 }
 
 /**
@@ -31,6 +37,7 @@ export interface InMemoryEventStoreOptions {
  */
 export class InMemoryEventStore implements EventStore {
   private readonly bufferPerStream: number;
+  private readonly maxStreams: number;
   private readonly streams = new Map<StreamId, StoredEvent[]>();
   private readonly index = new Map<EventId, StreamId>();
   private seq = 0;
@@ -39,14 +46,29 @@ export class InMemoryEventStore implements EventStore {
     if (!Number.isInteger(opts.bufferPerStream) || opts.bufferPerStream < 1) {
       throw new Error('bufferPerStream must be a positive integer');
     }
+    if (!Number.isInteger(opts.maxStreams) || opts.maxStreams < 1) {
+      throw new Error('maxStreams must be a positive integer');
+    }
     this.bufferPerStream = opts.bufferPerStream;
+    this.maxStreams = opts.maxStreams;
   }
 
   async storeEvent(streamId: StreamId, message: JSONRPCMessage): Promise<EventId> {
     const eventId = `${streamId}:${++this.seq}`;
     let events = this.streams.get(streamId);
     if (!events) {
+      // New stream: evict the least-recently-written stream first if at cap.
+      // Map iteration is insertion-order, so the first key is the oldest.
+      while (this.streams.size >= this.maxStreams) {
+        const oldest = this.streams.keys().next().value;
+        if (oldest === undefined) break;
+        this.dropStream(oldest);
+      }
       events = [];
+      this.streams.set(streamId, events);
+    } else {
+      // Refresh LRU position so the most-recently-written stream is "newest".
+      this.streams.delete(streamId);
       this.streams.set(streamId, events);
     }
     events.push({ eventId, message });
@@ -60,7 +82,22 @@ export class InMemoryEventStore implements EventStore {
   }
 
   async getStreamIdForEventId(eventId: EventId): Promise<StreamId | undefined> {
-    return this.index.get(eventId);
+    // Indexed hit: the event is still buffered, return its stream directly.
+    const known = this.index.get(eventId);
+    if (known !== undefined) return known;
+    // Graceful degradation for evicted IDs: if the parsed stream prefix still
+    // exists, return it so the SDK proceeds to `replayEventsAfter` (which
+    // replays whatever is left in the buffer). The SDK rejects an undefined
+    // result with 400 'Invalid event ID format' before ever calling replay.
+    const candidate = this.streamIdFromEventId(eventId);
+    return this.streams.has(candidate) ? candidate : undefined;
+  }
+
+  private dropStream(streamId: StreamId): void {
+    const events = this.streams.get(streamId);
+    if (!events) return;
+    for (const e of events) this.index.delete(e.eventId);
+    this.streams.delete(streamId);
   }
 
   async replayEventsAfter(

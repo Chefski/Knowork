@@ -46,7 +46,10 @@ export function buildApp(opts: BuildAppOptions): BuiltApp {
 
   // Single shared store across all sessions; SDK keys events by streamId, which
   // is unique per (session, SSE stream) tuple internally.
-  const eventStore = new InMemoryEventStore({ bufferPerStream: cfg.sseReplayBufferSize });
+  const eventStore = new InMemoryEventStore({
+    bufferPerStream: cfg.sseReplayBufferSize,
+    maxStreams: cfg.sseReplayMaxStreams,
+  });
 
   const mcpHandler = buildMcpHandler({
     createServer: () => buildMcpServer({ repo: repository, registry, logger }),
