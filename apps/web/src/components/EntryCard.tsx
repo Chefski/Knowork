@@ -2,12 +2,19 @@ import type { ActiveEntry } from '@apb/shared';
 import { relativeTime } from '../util/time.js';
 
 export function EntryCard({ entry, idle = false }: { entry: ActiveEntry; idle?: boolean }) {
+  const disconnected = !!entry.disconnected_at;
   return (
     <article
       className={
         'rounded-lg border bg-white p-3 text-sm transition ' +
-        (idle ? 'border-amber-200' : 'border-ink-200 hover:border-ink-400')
+        (disconnected
+          ? 'border-ink-200 opacity-60 saturate-50'
+          : idle
+            ? 'border-amber-200'
+            : 'border-ink-200 hover:border-ink-400')
       }
+      data-testid="entry-card"
+      data-disconnected={disconnected || undefined}
     >
       <header className="flex items-center justify-between gap-2">
         <strong className="truncate font-medium">{entry.agent_identity.name}</strong>
@@ -18,7 +25,12 @@ export function EntryCard({ entry, idle = false }: { entry: ActiveEntry; idle?: 
         <span className="truncate">{entry.repo}</span>
         {entry.branch && <span className="text-ink-400">@ {entry.branch}</span>}
         <span className="text-ink-400">started {relativeTime(entry.started_at)}</span>
-        {idle && <span className="text-amber-600">idle</span>}
+        {disconnected && (
+          <span className="text-ink-500" data-testid="reconnecting-indicator">
+            reconnecting…
+          </span>
+        )}
+        {!disconnected && idle && <span className="text-amber-600">idle</span>}
       </div>
       {entry.files.length > 0 && (
         <ul className="mt-2 flex flex-wrap gap-1 font-mono text-xs text-ink-400">

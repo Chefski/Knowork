@@ -92,7 +92,7 @@ export function TableView({
                     {e.intent}
                     {e.summary && <span className="text-ink-400"> — {e.summary}</span>}
                   </td>
-                  <td className="px-3 py-2 text-xs">{e.completion_reason}</td>
+                  <td className="px-3 py-2 text-xs">{prettyReason(e.completion_reason)}</td>
                   <td className="px-3 py-2 text-xs text-ink-600">{relativeTime(e.completed_at)}</td>
                 </tr>
               ))}
@@ -149,6 +149,22 @@ function sortEntries(items: ActiveEntry[], k: SortKey, dir: Direction): ActiveEn
     return 0;
   });
   return copy;
+}
+
+function prettyReason(reason: CompletedEntry['completion_reason']): string {
+  switch (reason) {
+    case 'completed':
+      return 'shipped';
+    case 'expired_then_completed':
+      return 'shipped (late)';
+    case 'session_closed':
+      return 'session closed';
+    case 'session_max_age':
+      return 'max age';
+    case 'expired':
+    default:
+      return 'expired';
+  }
 }
 
 function key(e: ActiveEntry, k: SortKey): string | number {

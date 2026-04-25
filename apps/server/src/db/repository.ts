@@ -69,7 +69,7 @@ export class Repository {
   private readonly selectCompletedByWorkId;
   private readonly updateExpiredToCompleted;
 
-  constructor(private readonly db: Db) {
+  constructor(db: Db) {
     this.insertRoom = db.prepare(
       'INSERT INTO rooms (code, created_at, last_active_at) VALUES (?, ?, ?)',
     );
@@ -100,7 +100,8 @@ export class Repository {
     this.updateExpiredToCompleted = db.prepare(`
       UPDATE completed_entries
       SET completed_at = ?, completion_reason = 'expired_then_completed', summary = ?
-      WHERE room_code = ? AND work_id = ? AND completion_reason = 'expired'
+      WHERE room_code = ? AND work_id = ?
+        AND completion_reason IN ('expired', 'session_closed', 'session_max_age')
     `);
   }
 

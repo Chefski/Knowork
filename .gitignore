@@ -29,3 +29,4 @@ coverage/
 !.vscode/settings.json.example
 
 openspec/
+.mcp.json

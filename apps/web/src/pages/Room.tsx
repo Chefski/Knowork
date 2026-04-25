@@ -45,6 +45,12 @@ export function Room() {
           case 'work_heartbeat':
             store.heartbeatEntry(event.work_id, event.last_seen);
             break;
+          case 'work_session_disconnected':
+            store.disconnectEntry(event.work_id, event.disconnected_at);
+            break;
+          case 'work_session_resumed':
+            store.resumeEntry(event.work_id);
+            break;
           case 'work_completed':
             store.completeEntry(event.work_id, event.entry);
             break;

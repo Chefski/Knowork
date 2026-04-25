@@ -16,6 +16,8 @@ interface RoomStore {
   setSnapshot(active: ActiveEntry[], recent: CompletedEntry[]): void;
   startEntry(entry: ActiveEntry): void;
   heartbeatEntry(workId: string, lastSeen: number): void;
+  disconnectEntry(workId: string, disconnectedAt: number): void;
+  resumeEntry(workId: string): void;
   completeEntry(workId: string, completed: CompletedEntry): void;
   expireEntry(workId: string, completed: CompletedEntry): void;
   setView(view: ViewMode): void;
@@ -50,6 +52,22 @@ export const useRoomStore = create<RoomStore>((set) => ({
   heartbeatEntry(workId, lastSeen) {
     set((s) => ({
       active: s.active.map((e) => (e.work_id === workId ? { ...e, last_seen: lastSeen } : e)),
+    }));
+  },
+
+  disconnectEntry(workId, disconnectedAt) {
+    set((s) => ({
+      active: s.active.map((e) =>
+        e.work_id === workId ? { ...e, disconnected_at: disconnectedAt } : e,
+      ),
+    }));
+  },
+
+  resumeEntry(workId) {
+    set((s) => ({
+      active: s.active.map((e) =>
+        e.work_id === workId ? { ...e, disconnected_at: null } : e,
+      ),
     }));
   },
 

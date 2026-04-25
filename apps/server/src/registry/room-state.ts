@@ -3,8 +3,10 @@ import type {
   ActiveEntry,
   AgentIdentity,
   CompletedEntry,
+  CompletionReason,
   OverlapMatch,
   ServerEvent,
+  WorkExpiredReason,
 } from '@apb/shared';
 import type { Repository } from '../db/repository.js';
 import { AsyncMutex } from '../util/mutex.js';
@@ -16,6 +18,7 @@ export interface StartWorkArgs {
   branch: string | null;
   intent: string;
   files: string[];
+  sessionId?: string;
 }
 
 export interface CheckOverlapArgs {
@@ -49,6 +52,11 @@ function tokenizePath(path: string): Set<string> {
 
 export class RoomState {
   readonly active = new Map<string, ActiveEntry>();
+  // workId -> sessionId for entries created via stateful sessions. Entries without
+  // a session_id (legacy stateless path) are absent from this map.
+  private readonly entrySessions = new Map<string, string>();
+  // sessionId -> set of workIds it owns. Reverse index for O(owned) cleanup on close.
+  private readonly sessionEntries = new Map<string, Set<string>>();
   private readonly subscribers = new Set<Subscriber>();
   private readonly mutex = new AsyncMutex();
 
@@ -71,8 +79,18 @@ export class RoomState {
         files: args.files,
         started_at: t,
         last_seen: t,
+        disconnected_at: null,
       };
       this.active.set(entry.work_id, entry);
+      if (args.sessionId) {
+        this.entrySessions.set(entry.work_id, args.sessionId);
+        let owned = this.sessionEntries.get(args.sessionId);
+        if (!owned) {
+          owned = new Set();
+          this.sessionEntries.set(args.sessionId, owned);
+        }
+        owned.add(entry.work_id);
+      }
       this.repo.touch(this.code, t);
       this.broadcast({ type: 'work_started', room: this.code, entry });
       return entry;
@@ -101,7 +119,14 @@ export class RoomState {
       if (!entry) {
         const existing = this.repo.getCompletedByWorkId(this.code, workId);
         if (!existing) return { status: 'not_found' };
-        if (existing.completion_reason !== 'expired') return { status: 'already_completed' };
+        if (existing.completion_reason === 'completed') return { status: 'already_completed' };
+        if (
+          existing.completion_reason !== 'expired' &&
+          existing.completion_reason !== 'session_closed' &&
+          existing.completion_reason !== 'session_max_age'
+        ) {
+          return { status: 'already_completed' };
+        }
 
         const completedAt = this.now();
         const completed = this.repo.markExpiredThenCompleted(
@@ -122,6 +147,7 @@ export class RoomState {
         return { status: 'completed', entry: completed };
       }
 
+      this.removeOwnership(workId);
       this.active.delete(workId);
       const completedAt = this.now();
       const completed: CompletedEntry = {
@@ -165,55 +191,181 @@ export class RoomState {
     });
   }
 
-  expireStale(maxAgeMs: number): CompletedEntry[] {
+  /**
+   * Mark every active entry owned by `sessionId` as disconnected and broadcast.
+   * Returns the number of entries flagged. Does not start any timer — the registry
+   * coordinates the single per-session grace timer that finalizes these entries.
+   */
+  markEntriesDisconnected(sessionId: string, t: number = this.now()): number {
+    const owned = this.sessionEntries.get(sessionId);
+    if (!owned || owned.size === 0) return 0;
+    let flagged = 0;
+    for (const workId of owned) {
+      const entry = this.active.get(workId);
+      if (!entry) continue;
+      if (entry.disconnected_at) continue; // already flagged
+      entry.disconnected_at = t;
+      this.broadcast({
+        type: 'work_session_disconnected',
+        room: this.code,
+        work_id: workId,
+        entry,
+        disconnected_at: t,
+      });
+      flagged++;
+    }
+    return flagged;
+  }
+
+  /**
+   * Clear the disconnected flag on every entry owned by `sessionId` and broadcast
+   * resume events. Called when the session reconnects within the grace window.
+   */
+  resumeEntries(sessionId: string, t: number = this.now()): number {
+    const owned = this.sessionEntries.get(sessionId);
+    if (!owned || owned.size === 0) return 0;
+    let resumed = 0;
+    for (const workId of owned) {
+      const entry = this.active.get(workId);
+      if (!entry) continue;
+      if (!entry.disconnected_at) continue;
+      entry.disconnected_at = null;
+      // Refresh last_seen so any legacy heartbeat path stays accurate.
+      entry.last_seen = t;
+      this.broadcast({
+        type: 'work_session_resumed',
+        room: this.code,
+        work_id: workId,
+        entry,
+        resumed_at: t,
+      });
+      resumed++;
+    }
+    return resumed;
+  }
+
+  /**
+   * Finalize every entry owned by `sessionId` that is still flagged as
+   * disconnected. Called when the registry-level grace timer fires.
+   */
+  finalizeDisconnectedSession(sessionId: string): CompletedEntry[] {
+    const owned = this.sessionEntries.get(sessionId);
+    if (!owned || owned.size === 0) return [];
+    const expired: CompletedEntry[] = [];
+    const stillOwned = Array.from(owned);
+    for (const workId of stillOwned) {
+      const entry = this.active.get(workId);
+      if (!entry) continue;
+      // Skip if the entry was reconnected (resume cleared the flag) or already
+      // finalized via another path (admin, late complete_work, etc.).
+      if (!entry.disconnected_at) continue;
+      const finalized = this.finalizeEntry(workId, entry, 'session_closed');
+      if (finalized) expired.push(finalized);
+    }
+    if (expired.length) this.repo.touch(this.code, this.now());
+    return expired;
+  }
+
+  /**
+   * Finalize entries whose `started_at` is older than the configured cap. Applies
+   * to every entry regardless of session connectivity — this is the zombie backstop.
+   */
+  expireMaxAge(maxAgeMs: number): CompletedEntry[] {
     const cutoff = this.now() - maxAgeMs;
     const expired: CompletedEntry[] = [];
     for (const [workId, entry] of this.active) {
-      if (entry.last_seen < cutoff) {
-        this.active.delete(workId);
-        const completedAt = this.now();
-        const completed: CompletedEntry = {
-          id: 0,
-          room_code: this.code,
-          work_id: workId,
-          agent_identity: entry.agent_identity,
-          tool: entry.tool,
-          repo: entry.repo,
-          branch: entry.branch,
-          intent: entry.intent,
-          files: entry.files,
-          started_at: entry.started_at,
-          completed_at: completedAt,
-          completion_reason: 'expired',
-          summary: null,
-        };
-        this.repo.recordCompleted({
-          roomCode: this.code,
-          workId,
-          agentIdentity: entry.agent_identity,
-          tool: entry.tool,
-          repo: entry.repo,
-          branch: entry.branch,
-          intent: entry.intent,
-          files: entry.files,
-          startedAt: entry.started_at,
-          completedAt,
-          completionReason: 'expired',
-          summary: null,
-        });
-        const persisted = this.repo.getCompletedByWorkId(this.code, workId) ?? completed;
-        expired.push(persisted);
-        this.broadcast({
-          type: 'work_expired',
-          room: this.code,
-          work_id: workId,
-          entry: persisted,
-          reason: 'heartbeat_missed',
-        });
+      if (entry.started_at < cutoff) {
+        const finalized = this.finalizeEntry(workId, entry, 'session_max_age');
+        if (finalized) expired.push(finalized);
       }
     }
     if (expired.length) this.repo.touch(this.code, this.now());
     return expired;
+  }
+
+  /**
+   * Legacy stateless heartbeat sweep — applies the wall-clock `last_seen` rule
+   * ONLY to entries that have no owning session (legacy stateless transport path).
+   * Session-bound entries are exempt; their liveness is governed by the connection.
+   */
+  expireStale(maxAgeMs: number): CompletedEntry[] {
+    const cutoff = this.now() - maxAgeMs;
+    const expired: CompletedEntry[] = [];
+    for (const [workId, entry] of this.active) {
+      if (this.entrySessions.has(workId)) continue; // session-bound; skip
+      if (entry.last_seen < cutoff) {
+        const finalized = this.finalizeEntry(workId, entry, 'heartbeat_missed');
+        if (finalized) expired.push(finalized);
+      }
+    }
+    if (expired.length) this.repo.touch(this.code, this.now());
+    return expired;
+  }
+
+  private finalizeEntry(
+    workId: string,
+    entry: ActiveEntry,
+    reason: WorkExpiredReason,
+  ): CompletedEntry | null {
+    this.removeOwnership(workId);
+    this.active.delete(workId);
+    const completedAt = this.now();
+    const completionReason: CompletionReason =
+      reason === 'heartbeat_missed' ? 'expired' : reason;
+    const completed: CompletedEntry = {
+      id: 0,
+      room_code: this.code,
+      work_id: workId,
+      agent_identity: entry.agent_identity,
+      tool: entry.tool,
+      repo: entry.repo,
+      branch: entry.branch,
+      intent: entry.intent,
+      files: entry.files,
+      started_at: entry.started_at,
+      completed_at: completedAt,
+      completion_reason: completionReason,
+      summary: null,
+    };
+    this.repo.recordCompleted({
+      roomCode: this.code,
+      workId,
+      agentIdentity: entry.agent_identity,
+      tool: entry.tool,
+      repo: entry.repo,
+      branch: entry.branch,
+      intent: entry.intent,
+      files: entry.files,
+      startedAt: entry.started_at,
+      completedAt,
+      completionReason,
+      summary: null,
+    });
+    const persisted = this.repo.getCompletedByWorkId(this.code, workId) ?? completed;
+    this.broadcast({
+      type: 'work_expired',
+      room: this.code,
+      work_id: workId,
+      entry: persisted,
+      reason,
+    });
+    return persisted;
+  }
+
+  private removeOwnership(workId: string): void {
+    const sessionId = this.entrySessions.get(workId);
+    if (!sessionId) return;
+    this.entrySessions.delete(workId);
+    const owned = this.sessionEntries.get(sessionId);
+    if (owned) {
+      owned.delete(workId);
+      if (owned.size === 0) this.sessionEntries.delete(sessionId);
+    }
+  }
+
+  hasSession(sessionId: string): boolean {
+    const owned = this.sessionEntries.get(sessionId);
+    return !!owned && owned.size > 0;
   }
 
   checkOverlap(args: CheckOverlapArgs): OverlapMatch[] {

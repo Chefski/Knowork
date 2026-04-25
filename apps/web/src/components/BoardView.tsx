@@ -8,19 +8,27 @@ const EXPIRY_THRESHOLD_MS = 90_000;
 
 export function BoardView({ active, recent }: { active: ActiveEntry[]; recent: CompletedEntry[] }) {
   const now = useNow(5_000);
-  const live = active.filter((e) => now - e.last_seen < IDLE_THRESHOLD_MS);
-  const idle = active.filter((e) => {
+  // Disconnected entries (session in grace) render with their own ghosted treatment.
+  // They are NOT bucketed into idle/expired which are wall-clock heuristics for the
+  // legacy stateless heartbeat path.
+  const disconnected = active.filter((e) => e.disconnected_at);
+  const liveOrIdle = active.filter((e) => !e.disconnected_at);
+  const live = liveOrIdle.filter((e) => now - e.last_seen < IDLE_THRESHOLD_MS);
+  const idle = liveOrIdle.filter((e) => {
     const age = now - e.last_seen;
     return age >= IDLE_THRESHOLD_MS && age < EXPIRY_THRESHOLD_MS;
   });
 
   return (
     <div className="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-3">
-      <Column title="Active" count={live.length}>
+      <Column title="Active" count={live.length + disconnected.length}>
         {live.map((entry) => (
           <EntryCard key={entry.work_id} entry={entry} />
         ))}
-        {!live.length && <Empty>No active work right now.</Empty>}
+        {disconnected.map((entry) => (
+          <EntryCard key={entry.work_id} entry={entry} />
+        ))}
+        {!live.length && !disconnected.length && <Empty>No active work right now.</Empty>}
       </Column>
       <Column title="Idle" count={idle.length}>
         {idle.map((entry) => (
