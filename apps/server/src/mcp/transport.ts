@@ -5,7 +5,11 @@ import type { Logger } from '../logger.js';
 import type { RateLimiter } from '../util/rate-limit.js';
 
 export interface McpHandlerDeps {
-  server: McpServer;
+  // Factory invoked per request. Stateless StreamableHTTPServerTransport in the
+  // MCP SDK requires a fresh Server per connection — sharing one across requests
+  // throws "Already connected to a transport" as soon as two calls overlap and
+  // permanently wedges the singleton. See transport.test.ts for proof.
+  createServer: () => McpServer;
   logger: Logger;
   writeRateLimiter: RateLimiter;
   ipFromReq: (req: IncomingMessage) => string;
@@ -74,12 +78,14 @@ export function buildMcpHandler(deps: McpHandlerDeps) {
     }
 
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+    const server = deps.createServer();
     res.on('close', () => {
       void transport.close();
+      void server.close();
     });
 
     try {
-      await deps.server.connect(transport);
+      await server.connect(transport);
       await transport.handleRequest(req, res, body);
     } catch (err) {
       deps.logger.error({ err }, 'mcp handler error');

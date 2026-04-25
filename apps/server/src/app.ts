@@ -41,9 +41,8 @@ export function buildApp(opts: BuildAppOptions): BuiltApp {
 
   const writeRateLimiter = new RateLimiter(cfg.rateLimitWritesPerMinute, 60_000);
 
-  const mcpServer = buildMcpServer({ repo: repository, registry, logger });
   const mcpHandler = buildMcpHandler({
-    server: mcpServer,
+    createServer: () => buildMcpServer({ repo: repository, registry, logger }),
     logger,
     writeRateLimiter,
     ipFromReq: ipFromIncomingMessage,
