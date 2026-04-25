@@ -20,7 +20,7 @@ interface Chunk {
 }
 
 const TABLE_ARRAY_RE = /^\s*\[\[\s*([^\]]+?)\s*\]\]\s*(#.*)?$/;
-const TABLE_RE = /^\s*\[\s*([^\[\]]+?)\s*\]\s*(#.*)?$/;
+const TABLE_RE = /^\s*\[\s*([^[\]]+?)\s*\]\s*(#.*)?$/;
 const NAME_LINE_RE = /^\s*name\s*=\s*"([^"]*)"/;
 
 function parseHeader(line: string): { kind: 'array' | 'table'; path: string } | null {
@@ -153,7 +153,7 @@ function buildChunkLines(
   // (X-Room-Code, Authorization). Knowork-managed always wins, so a stale
   // X-Room-Code that the user typed manually gets corrected on re-run.
   const headers: Record<string, string> = {
-    ...(opts.preservedHeaders ?? {}),
+    ...opts.preservedHeaders,
     ...entry.headers,
   };
   headers['X-Room-Code'] = opts.roomCode;

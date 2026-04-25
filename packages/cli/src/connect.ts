@@ -152,7 +152,7 @@ function mcpEndpoint(serverUrl: string): string {
   // Accept either the bare host or a path that already ends in /mcp; we
   // normalize to /mcp so the user can paste either.
   const trimmed = serverUrl.replace(/\/+$/, '');
-  return /\/mcp$/.test(trimmed) ? trimmed : `${trimmed}/mcp`;
+  return trimmed.endsWith('/mcp') ? trimmed : `${trimmed}/mcp`;
 }
 
 function printConnectSummary(

@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import { connect } from './connect.js';
 import { disconnect } from './disconnect.js';
-import type { ConnectOptions, DisconnectOptions, ScopeFlag } from './types.js';
+import type { ScopeFlag } from './types.js';
 import { CliError, exitWithError } from './errors.js';
 
 const PACKAGE_VERSION = '0.1.0';

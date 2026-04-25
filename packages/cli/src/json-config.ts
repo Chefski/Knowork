@@ -38,7 +38,7 @@ export function applyMcpEntryJson(
   // in between user headers and managed headers.
   const existingEntry = mcpServers[key];
   const headers: Record<string, string> = {
-    ...(existingEntry?.headers ?? {}),
+    ...existingEntry?.headers,
     ...entry.headers,
   };
   headers['X-Room-Code'] = opts.roomCode;
