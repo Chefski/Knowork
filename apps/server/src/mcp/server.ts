@@ -31,7 +31,7 @@ function toolErrorResult(err: ToolError) {
 }
 
 export function buildMcpServer(deps: McpDeps): McpServer {
-  const { repo, registry } = deps;
+  const { repo, registry, logger } = deps;
 
   const server = new McpServer(
     {
@@ -95,7 +95,7 @@ export function buildMcpServer(deps: McpDeps): McpServer {
         files: input.files ?? [],
         sessionId: extra?.sessionId,
       });
-      deps.logger.info(
+      logger.info(
         {
           event: 'start_work',
           room: input.room,
@@ -148,7 +148,7 @@ export function buildMcpServer(deps: McpDeps): McpServer {
       const state = registry.getOrCreate(input.room);
       const outcome = await state.completeWork(input.work_id, input.summary ?? null);
       if (outcome.status === 'completed') {
-        deps.logger.info(
+        logger.info(
           { event: 'complete_work', room: input.room, work_id: input.work_id },
           'work completed',
         );

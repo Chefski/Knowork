@@ -11,25 +11,12 @@ export function Header({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
   const [connectOpen, setConnectOpen] = useState(false);
 
-  async function copyCode() {
+  async function copyToClipboard(text: string): Promise<void> {
     try {
-      await navigator.clipboard.writeText(code);
+      await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // ignore
-    }
-  }
-
-  async function shareLink() {
-    const url = `${window.location.origin}/r/${code}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // ignore
-    }
+    } catch {}
   }
 
   // Same origin as shareLink; the MCP server is mounted at /mcp on the same host.
@@ -41,7 +28,7 @@ export function Header({ code }: { code: string }) {
         <span className="text-xs uppercase tracking-wider text-ink-400">room</span>
         <button
           type="button"
-          onClick={copyCode}
+          onClick={() => copyToClipboard(code)}
           title="Copy room code"
           className="font-mono text-2xl font-semibold tracking-[0.25em] hover:text-ink-600"
         >
@@ -49,7 +36,7 @@ export function Header({ code }: { code: string }) {
         </button>
         <button
           type="button"
-          onClick={shareLink}
+          onClick={() => copyToClipboard(`${window.location.origin}/r/${code}`)}
           className="rounded border border-ink-200 px-2 py-1 text-xs hover:bg-ink-100"
         >
           Share link
@@ -124,13 +111,13 @@ function ToggleButton({
   );
 }
 
+const CONNECTION_STYLES: Record<'connecting' | 'open' | 'closed', { cls: string; text: string }> = {
+  open: { cls: 'bg-emerald-100 text-emerald-700', text: 'live' },
+  connecting: { cls: 'bg-amber-100 text-amber-700', text: 'connecting' },
+  closed: { cls: 'bg-red-100 text-red-700', text: 'reconnecting' },
+};
+
 function ConnectionBadge({ state }: { state: 'connecting' | 'open' | 'closed' }) {
-  const cls =
-    state === 'open'
-      ? 'bg-emerald-100 text-emerald-700'
-      : state === 'connecting'
-        ? 'bg-amber-100 text-amber-700'
-        : 'bg-red-100 text-red-700';
-  const text = state === 'open' ? 'live' : state === 'connecting' ? 'connecting' : 'reconnecting';
+  const { cls, text } = CONNECTION_STYLES[state];
   return <span className={`rounded px-2 py-0.5 text-xs ${cls}`}>{text}</span>;
 }

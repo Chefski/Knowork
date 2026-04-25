@@ -75,7 +75,7 @@ function CopyButton({ text, label = 'Copy', testId }: CopyButtonProps) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      // ignore
+      // clipboard unavailable (insecure context / denied permission) — leave state unchanged
     }
   }
 

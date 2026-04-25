@@ -17,9 +17,7 @@ export function isInsideGitRepo(cwd: string = process.cwd()): boolean {
       try {
         const stat = statSync(gitPath);
         if (stat.isDirectory() || stat.isFile()) return true;
-      } catch {
-        // ignore
-      }
+      } catch {}
     }
     const parent = resolve(dir, '..');
     if (parent === dir) break;
@@ -65,7 +63,6 @@ export function resolveScope(
     }
     return 'project';
   }
-  // auto
   if (adapterSupportsProject && isInsideGitRepo(cwd)) return 'project';
   return 'global';
 }

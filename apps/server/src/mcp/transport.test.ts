@@ -18,6 +18,19 @@ import { runMigrations } from '../db/migrate.js';
 import { Repository as RepoCtor } from '../db/repository.js';
 import { RoomRegistry as RegistryCtor } from '../registry/registry.js';
 
+function initBody(id: number) {
+  return {
+    jsonrpc: '2.0',
+    id,
+    method: 'initialize',
+    params: {
+      protocolVersion: '2025-03-26',
+      capabilities: {},
+      clientInfo: { name: 'test', version: '1.0' },
+    },
+  };
+}
+
 describe('@modelcontextprotocol/sdk transport invariants', () => {
   it('McpServer.connect throws if reused without close (singleton hazard)', async () => {
     // Documents why buildMcpHandler must mint one McpServer per session/transport.
@@ -106,19 +119,6 @@ describe('buildMcpHandler stateful session routing', () => {
   afterEach(async () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   });
-
-  function initBody(id: number) {
-    return {
-      jsonrpc: '2.0',
-      id,
-      method: 'initialize',
-      params: {
-        protocolVersion: '2025-03-26',
-        capabilities: {},
-        clientInfo: { name: 'test', version: '1.0' },
-      },
-    };
-  }
 
   it('initialize returns mcp-session-id and onSessionStarted fires', async () => {
     const res = await fetch(`${baseUrl}/mcp`, {

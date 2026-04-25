@@ -2,16 +2,12 @@
 // otherwise global. `project` and `global` are explicit overrides.
 export type ScopeFlag = 'auto' | 'project' | 'global';
 
-// Resolved scope passed to adapters once detection has run.
 export type ResolvedScope = 'project' | 'global';
 
 export interface McpEntry {
-  // Server URL, e.g. "https://knowork.app/mcp".
   url: string;
-  // Optional token to embed as `Authorization: Bearer <token>`.
   token?: string;
-  // Headers other than Authorization. Currently always includes X-Room-Code so
-  // existing servers that key off it keep working.
+  // Always includes X-Room-Code so existing servers that key off it keep working.
   headers: Record<string, string>;
 }
 
@@ -35,9 +31,8 @@ export interface DisconnectOptions {
   assumeYes: boolean;
 }
 
-// One planned write computed before any file is touched. The CLI buffers all
-// of these, prints the summary, then either applies them all or (for
-// `--dry-run`) prints diffs and exits.
+// Buffered before any file is touched so the CLI can print a summary and
+// either apply them all or (for `--dry-run`) print diffs and exit.
 export interface PlannedWrite {
   path: string;
   before: string | null;

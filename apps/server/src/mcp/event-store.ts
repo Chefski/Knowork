@@ -57,8 +57,7 @@ export class InMemoryEventStore implements EventStore {
     const eventId = `${streamId}:${++this.seq}`;
     let events = this.streams.get(streamId);
     if (!events) {
-      // New stream: evict the least-recently-written stream first if at cap.
-      // Map iteration is insertion-order, so the first key is the oldest.
+      // Map iteration is insertion-order, so the first key is the LRU stream.
       while (this.streams.size >= this.maxStreams) {
         const oldest = this.streams.keys().next().value;
         if (oldest === undefined) break;
@@ -67,7 +66,7 @@ export class InMemoryEventStore implements EventStore {
       events = [];
       this.streams.set(streamId, events);
     } else {
-      // Refresh LRU position so the most-recently-written stream is "newest".
+      // Re-insert to refresh LRU position.
       this.streams.delete(streamId);
       this.streams.set(streamId, events);
     }
@@ -82,13 +81,11 @@ export class InMemoryEventStore implements EventStore {
   }
 
   async getStreamIdForEventId(eventId: EventId): Promise<StreamId | undefined> {
-    // Indexed hit: the event is still buffered, return its stream directly.
     const known = this.index.get(eventId);
     if (known !== undefined) return known;
-    // Graceful degradation for evicted IDs: if the parsed stream prefix still
-    // exists, return it so the SDK proceeds to `replayEventsAfter` (which
-    // replays whatever is left in the buffer). The SDK rejects an undefined
-    // result with 400 'Invalid event ID format' before ever calling replay.
+    // Evicted ID: fall back to the parsed stream prefix so the SDK still calls
+    // `replayEventsAfter` (which replays whatever is left in the buffer).
+    // Returning undefined would make the SDK reject with 400 'Invalid event ID format'.
     const candidate = this.streamIdFromEventId(eventId);
     return this.streams.has(candidate) ? candidate : undefined;
   }
@@ -114,6 +111,7 @@ export class InMemoryEventStore implements EventStore {
 
     for (let i = startIdx; i < events.length; i++) {
       const e = events[i]!;
+      // eslint-disable-next-line no-await-in-loop -- SSE replay must deliver events in order
       await send(e.eventId, e.message);
     }
     return streamId;

@@ -44,7 +44,7 @@ async function main(): Promise<void> {
     });
   });
 
-  const shutdown = async (signal: string) => {
+  async function shutdown(signal: string): Promise<void> {
     logger.info({ signal }, 'shutdown initiated');
     built.registry.stopSweep();
     await wsGateway.close();
@@ -52,7 +52,7 @@ async function main(): Promise<void> {
     db.close();
     logger.info('shutdown complete');
     process.exit(0);
-  };
+  }
 
   process.on('SIGINT', () => void shutdown('SIGINT'));
   process.on('SIGTERM', () => void shutdown('SIGTERM'));

@@ -29,7 +29,6 @@ describe('resolveScope', () => {
   it('auto picks global outside a git repo', () => {
     const tmp = mkdtempSync(join(tmpdir(), 'knowork-scope-'));
     try {
-      // No .git directory.
       expect(resolveScope('auto', true, tmp)).toBe('global');
     } finally {
       rmSync(tmp, { recursive: true, force: true });

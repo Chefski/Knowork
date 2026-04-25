@@ -11,16 +11,17 @@ export function renderPlannedWrites(plans: PlannedWrite[]): string {
 
 function renderOne(plan: PlannedWrite): string {
   const header = `--- ${plan.path}`;
-  if (plan.before === null && plan.after !== null) {
-    return [header, `+++ (new file) — ${plan.reason}`, indent(plan.after, '+ ')].join('\n') + '\n';
+  const { before, after, reason } = plan;
+  if (before === null && after !== null) {
+    return `${header}\n+++ (new file) — ${reason}\n${indent(after, '+ ')}\n`;
   }
-  if (plan.before !== null && plan.after === null) {
-    return [header, `+++ (deleted) — ${plan.reason}`, indent(plan.before, '- ')].join('\n') + '\n';
+  if (before !== null && after === null) {
+    return `${header}\n+++ (deleted) — ${reason}\n${indent(before, '- ')}\n`;
   }
-  if (plan.before === plan.after) {
-    return [header, `(no change) — ${plan.reason}`].join('\n') + '\n';
+  if (before === after) {
+    return `${header}\n(no change) — ${reason}\n`;
   }
-  return [header, `+++ ${plan.path} — ${plan.reason}`, naiveDiff(plan.before ?? '', plan.after ?? '')].join('\n') + '\n';
+  return `${header}\n+++ ${plan.path} — ${reason}\n${naiveDiff(before ?? '', after ?? '')}\n`;
 }
 
 function indent(s: string, prefix: string): string {

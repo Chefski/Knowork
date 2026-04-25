@@ -1,9 +1,9 @@
 import { consola } from 'consola';
 
+// CliError messages are designed to be printed verbatim to the user — they
+// describe a recoverable misuse, not an internal bug. Treat any non-CliError
+// exception as an unexpected crash.
 export class CliError extends Error {
-  // CliError messages are designed to be printed verbatim to the user — they
-  // describe a recoverable misuse, not an internal bug. Treat any non-CliError
-  // exception as an unexpected crash.
   readonly remediation?: string;
   readonly exitCode: number;
   constructor(message: string, opts: { remediation?: string; exitCode?: number } = {}) {

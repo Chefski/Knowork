@@ -45,15 +45,12 @@ describe('HTTP + WebSocket integration', () => {
 
     const ws = new WebSocket(h.wsUrl(code));
     const events: ServerEvent[] = [];
-    ws.on('message', (raw) => {
-      events.push(JSON.parse(raw.toString()) as ServerEvent);
-    });
+    ws.on('message', (raw) => events.push(JSON.parse(raw.toString()) as ServerEvent));
     await new Promise<void>((resolve, reject) => {
       ws.once('open', resolve);
       ws.once('error', reject);
     });
 
-    // Wait for snapshot
     await waitFor(() => events.some((e) => e.type === 'snapshot'), 1_000);
 
     const room = h.built.registry.getOrCreate(code);
@@ -69,7 +66,7 @@ describe('HTTP + WebSocket integration', () => {
 
     const startEvent = events.find((e) => e.type === 'work_started');
     expect(startEvent).toBeTruthy();
-    if (startEvent && startEvent.type === 'work_started') {
+    if (startEvent?.type === 'work_started') {
       expect(startEvent.entry.agent_identity.name).toBe('Alice');
     }
 
