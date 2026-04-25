@@ -15,8 +15,9 @@ interface RoomStore {
   enterRoom(code: string): void;
   setSnapshot(active: ActiveEntry[], recent: CompletedEntry[]): void;
   startEntry(entry: ActiveEntry): void;
-  completeEntry(completed: CompletedEntry): void;
-  expireEntry(completed: CompletedEntry): void;
+  heartbeatEntry(workId: string, lastSeen: number): void;
+  completeEntry(workId: string, completed: CompletedEntry): void;
+  expireEntry(workId: string, completed: CompletedEntry): void;
   setView(view: ViewMode): void;
   setSearch(query: string): void;
   setConnection(state: ConnectionState): void;
@@ -46,17 +47,23 @@ export const useRoomStore = create<RoomStore>((set) => ({
     }));
   },
 
-  completeEntry(completed) {
+  heartbeatEntry(workId, lastSeen) {
     set((s) => ({
-      active: s.active.filter((e) => e.work_id !== findWorkId(s.active, completed)),
-      recent: [completed, ...s.recent].slice(0, HISTORY_CAP),
+      active: s.active.map((e) => (e.work_id === workId ? { ...e, last_seen: lastSeen } : e)),
     }));
   },
 
-  expireEntry(completed) {
+  completeEntry(workId, completed) {
     set((s) => ({
-      active: s.active.filter((e) => e.work_id !== findWorkId(s.active, completed)),
-      recent: [completed, ...s.recent].slice(0, HISTORY_CAP),
+      active: s.active.filter((e) => e.work_id !== workId),
+      recent: [completed, ...s.recent.filter((e) => e.work_id !== workId)].slice(0, HISTORY_CAP),
+    }));
+  },
+
+  expireEntry(workId, completed) {
+    set((s) => ({
+      active: s.active.filter((e) => e.work_id !== workId),
+      recent: [completed, ...s.recent.filter((e) => e.work_id !== workId)].slice(0, HISTORY_CAP),
     }));
   },
 
@@ -70,14 +77,3 @@ export const useRoomStore = create<RoomStore>((set) => ({
     set({ connection: state });
   },
 }));
-
-function findWorkId(active: ActiveEntry[], completed: CompletedEntry): string | undefined {
-  const match = active.find(
-    (a) =>
-      a.repo === completed.repo &&
-      a.intent === completed.intent &&
-      a.started_at === completed.started_at &&
-      a.agent_identity.name === completed.agent_identity.name,
-  );
-  return match?.work_id;
-}

@@ -4,17 +4,15 @@ import { EntryCard } from './EntryCard.js';
 import { CompletedCard } from './CompletedCard.js';
 
 const IDLE_THRESHOLD_MS = 60_000;
+const EXPIRY_THRESHOLD_MS = 90_000;
 
-export function BoardView({
-  active,
-  recent,
-}: {
-  active: ActiveEntry[];
-  recent: CompletedEntry[];
-}) {
+export function BoardView({ active, recent }: { active: ActiveEntry[]; recent: CompletedEntry[] }) {
   const now = useNow(5_000);
   const live = active.filter((e) => now - e.last_seen < IDLE_THRESHOLD_MS);
-  const idle = active.filter((e) => now - e.last_seen >= IDLE_THRESHOLD_MS);
+  const idle = active.filter((e) => {
+    const age = now - e.last_seen;
+    return age >= IDLE_THRESHOLD_MS && age < EXPIRY_THRESHOLD_MS;
+  });
 
   return (
     <div className="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-3">

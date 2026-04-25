@@ -15,8 +15,6 @@ export interface RouteDeps {
   logger: Logger;
 }
 
-const MAX_ROOM_CREATE_ATTEMPTS = 8;
-
 export function buildApiRouter(deps: RouteDeps): Hono {
   const { cfg, repo, registry } = deps;
 
@@ -24,22 +22,22 @@ export function buildApiRouter(deps: RouteDeps): Hono {
 
   const api = new Hono();
 
-  api.post('/rooms', rateLimit(roomCreateLimiter, (c) => `rooms:${clientIp(c)}`), (c) => {
-    let code: string | null = null;
-    for (let attempt = 0; attempt < MAX_ROOM_CREATE_ATTEMPTS; attempt++) {
-      const candidate = generateRoomCode();
-      if (!repo.getRoom(candidate)) {
-        repo.createRoom(candidate);
-        code = candidate;
-        break;
+  api.post(
+    '/rooms',
+    rateLimit(roomCreateLimiter, (c) => `rooms:${clientIp(c)}`),
+    (c) => {
+      let code: string | null = null;
+      while (!code) {
+        const candidate = generateRoomCode();
+        if (!repo.getRoom(candidate)) {
+          repo.createRoom(candidate);
+          code = candidate;
+        }
       }
-    }
-    if (!code) {
-      return c.json({ error: 'room_code_generation_failed' }, 500);
-    }
-    deps.logger.info({ event: 'room_created', code }, 'room created');
-    return c.json({ code });
-  });
+      deps.logger.info({ event: 'room_created', code }, 'room created');
+      return c.json({ code });
+    },
+  );
 
   api.get('/rooms/:code', (c) => {
     const parsed = RoomCodeSchema.safeParse(c.req.param('code'));
@@ -68,10 +66,10 @@ export function buildApiRouter(deps: RouteDeps): Hono {
     const room = repo.getRoom(parsed.data);
     if (!room) return c.json({ error: 'room_not_found' }, 404);
     const limitRaw = c.req.query('limit');
-    const limit = Math.min(
-      Number.isFinite(Number(limitRaw)) ? Number(limitRaw) : cfg.historyLimit,
-      cfg.historyLimit,
-    );
+    const parsedLimit = limitRaw ? Number.parseInt(limitRaw, 10) : cfg.historyLimit;
+    const limit = Number.isFinite(parsedLimit)
+      ? Math.max(1, Math.min(parsedLimit, cfg.historyLimit))
+      : cfg.historyLimit;
     const entries = repo.listRecentlyShipped(parsed.data, limit);
     return c.json({ entries });
   });

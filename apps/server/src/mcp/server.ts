@@ -108,14 +108,15 @@ export function buildMcpServer(deps: McpDeps): McpServer {
       inputSchema: HeartbeatInputSchema.shape,
     },
     async (input) => {
-      for (const room of allRooms(registry)) {
-        const outcome = await room.heartbeat(input.work_id);
-        if (outcome.status === 'ok') {
-          return {
-            content: [{ type: 'text', text: 'ok' }],
-            structuredContent: { ok: true },
-          };
-        }
+      const room = repo.getRoom(input.room);
+      if (!room) return toolErrorResult({ code: 'room_not_found', message: input.room });
+      const state = registry.getOrCreate(input.room);
+      const outcome = await state.heartbeat(input.work_id);
+      if (outcome.status === 'ok') {
+        return {
+          content: [{ type: 'text', text: 'ok' }],
+          structuredContent: { ok: true },
+        };
       }
       return toolErrorResult({ code: 'work_not_found', message: input.work_id });
     },
@@ -129,18 +130,22 @@ export function buildMcpServer(deps: McpDeps): McpServer {
       inputSchema: CompleteWorkInputSchema.shape,
     },
     async (input) => {
-      for (const room of allRooms(registry)) {
-        const outcome = await room.completeWork(input.work_id, input.summary ?? null);
-        if (outcome.status === 'completed') {
-          deps.logger.info(
-            { event: 'complete_work', work_id: input.work_id },
-            'work completed',
-          );
-          return {
-            content: [{ type: 'text', text: 'ok' }],
-            structuredContent: { ok: true },
-          };
-        }
+      const room = repo.getRoom(input.room);
+      if (!room) return toolErrorResult({ code: 'room_not_found', message: input.room });
+      const state = registry.getOrCreate(input.room);
+      const outcome = await state.completeWork(input.work_id, input.summary ?? null);
+      if (outcome.status === 'completed') {
+        deps.logger.info(
+          { event: 'complete_work', room: input.room, work_id: input.work_id },
+          'work completed',
+        );
+        return {
+          content: [{ type: 'text', text: 'ok' }],
+          structuredContent: { ok: true },
+        };
+      }
+      if (outcome.status === 'already_completed') {
+        return toolErrorResult({ code: 'work_already_completed', message: input.work_id });
       }
       return toolErrorResult({ code: 'work_not_found', message: input.work_id });
     },
@@ -167,10 +172,4 @@ export function buildMcpServer(deps: McpDeps): McpServer {
   );
 
   return server;
-}
-
-function allRooms(registry: RoomRegistry) {
-  const out: Array<ReturnType<RoomRegistry['get']>> = [];
-  registry.forEach((r) => out.push(r));
-  return out.filter((r): r is NonNullable<typeof r> => Boolean(r));
 }

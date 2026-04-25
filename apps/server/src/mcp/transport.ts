@@ -19,14 +19,25 @@ const WRITE_TOOLS = new Set(['start_work', 'heartbeat', 'complete_work']);
 
 interface JsonRpcCallToolBody {
   method?: string;
-  params?: { name?: string };
+  params?: { name?: string; arguments?: { room?: unknown } };
 }
 
-function isWriteToolCall(body: unknown): boolean {
-  if (!body || typeof body !== 'object') return false;
-  const b = body as JsonRpcCallToolBody;
-  if (b.method !== 'tools/call') return false;
-  return WRITE_TOOLS.has(b.params?.name ?? '');
+function writeRateLimitKeys(body: unknown, ip: string): string[] {
+  const calls = Array.isArray(body) ? body : [body];
+  const keys: string[] = [];
+
+  for (const call of calls) {
+    if (!call || typeof call !== 'object') continue;
+    const b = call as JsonRpcCallToolBody;
+    if (b.method !== 'tools/call') continue;
+    if (!WRITE_TOOLS.has(b.params?.name ?? '')) continue;
+
+    const room = b.params?.arguments?.room;
+    const roomKey = typeof room === 'string' && room.length > 0 ? room.toUpperCase() : 'unknown';
+    keys.push(`mcp-write:${ip}:${roomKey}`);
+  }
+
+  return keys;
 }
 
 async function readBody(req: IncomingMessage): Promise<unknown> {
@@ -65,9 +76,9 @@ export function buildMcpHandler(deps: McpHandlerDeps) {
       return;
     }
 
-    if (isWriteToolCall(body)) {
-      const ip = deps.ipFromReq(req);
-      const decision = deps.writeRateLimiter.consume(`mcp-write:${ip}`);
+    const ip = deps.ipFromReq(req);
+    for (const key of writeRateLimitKeys(body, ip)) {
+      const decision = deps.writeRateLimiter.consume(key);
       if (!decision.allowed) {
         res.statusCode = 429;
         res.setHeader('Content-Type', 'application/json');

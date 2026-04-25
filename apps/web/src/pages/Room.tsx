@@ -42,11 +42,14 @@ export function Room() {
           case 'work_started':
             store.startEntry(event.entry);
             break;
+          case 'work_heartbeat':
+            store.heartbeatEntry(event.work_id, event.last_seen);
+            break;
           case 'work_completed':
-            store.completeEntry(event.entry);
+            store.completeEntry(event.work_id, event.entry);
             break;
           case 'work_expired':
-            store.expireEntry(event.entry);
+            store.expireEntry(event.work_id, event.entry);
             break;
           case 'pong':
             break;
@@ -62,8 +65,14 @@ export function Room() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code]);
 
-  const filteredActive = useMemo(() => filterActive(store.active, store.search), [store.active, store.search]);
-  const filteredRecent = useMemo(() => filterRecent(store.recent, store.search), [store.recent, store.search]);
+  const filteredActive = useMemo(
+    () => filterActive(store.active, store.search),
+    [store.active, store.search],
+  );
+  const filteredRecent = useMemo(
+    () => filterRecent(store.recent, store.search),
+    [store.recent, store.search],
+  );
 
   return (
     <div className="flex min-h-full flex-col">

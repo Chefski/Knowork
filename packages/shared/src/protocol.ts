@@ -20,6 +20,7 @@ export interface ActiveEntry {
 export interface CompletedEntry {
   id: number;
   room_code: string;
+  work_id: string | null;
   agent_identity: AgentIdentity;
   tool: string;
   repo: string;
@@ -40,13 +41,18 @@ export interface SnapshotPayload {
 export type ServerEvent =
   | { type: 'snapshot'; room: string; data: SnapshotPayload }
   | { type: 'work_started'; room: string; entry: ActiveEntry }
-  | { type: 'work_completed'; room: string; entry: CompletedEntry }
-  | { type: 'work_expired'; room: string; entry: CompletedEntry; reason: 'heartbeat_missed' }
+  | { type: 'work_heartbeat'; room: string; work_id: string; last_seen: number }
+  | { type: 'work_completed'; room: string; work_id: string; entry: CompletedEntry }
+  | {
+      type: 'work_expired';
+      room: string;
+      work_id: string;
+      entry: CompletedEntry;
+      reason: 'heartbeat_missed';
+    }
   | { type: 'pong'; t: number };
 
-export type ClientMessage =
-  | { type: 'subscribe' }
-  | { type: 'ping'; t?: number };
+export type ClientMessage = { type: 'subscribe' } | { type: 'ping'; t?: number };
 
 export interface OverlapMatch {
   entry: ActiveEntry;

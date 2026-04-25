@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+export const ROOM_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+export const ROOM_CODE_PATTERN = /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]+$/;
+
 export const AgentIdentitySchema = z.object({
   name: z.string().min(1).max(120),
   tool: z.string().min(1).max(60),
@@ -8,7 +11,7 @@ export const AgentIdentitySchema = z.object({
 export const RoomCodeSchema = z
   .string()
   .length(6)
-  .regex(/^[A-Z2-9]+$/, 'Room code must use base32 alphabet (A-Z, 2-9, no 0/O/1/I/L)');
+  .regex(ROOM_CODE_PATTERN, 'Room code must use base32 alphabet (A-Z, 2-9, no 0/O/1/I/L)');
 
 export const StartWorkInputSchema = z.object({
   room: RoomCodeSchema,
@@ -20,10 +23,12 @@ export const StartWorkInputSchema = z.object({
 });
 
 export const HeartbeatInputSchema = z.object({
+  room: RoomCodeSchema,
   work_id: z.string().min(1),
 });
 
 export const CompleteWorkInputSchema = z.object({
+  room: RoomCodeSchema,
   work_id: z.string().min(1),
   summary: z.string().max(2000).optional(),
 });

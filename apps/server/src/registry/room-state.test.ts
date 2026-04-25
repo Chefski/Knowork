@@ -89,7 +89,7 @@ describe('RoomState', () => {
     expect(recent[0]!.completion_reason).toBe('completed');
   });
 
-  it('double-complete returns not_found on second call', async () => {
+  it('double-complete returns already_completed on second call', async () => {
     const entry = await state.startWork({
       agentIdentity: { name: 'A', tool: 'T' },
       repo: 'r',
@@ -100,7 +100,7 @@ describe('RoomState', () => {
     const first = await state.completeWork(entry.work_id, null);
     const second = await state.completeWork(entry.work_id, null);
     expect(first.status).toBe('completed');
-    expect(second.status).toBe('not_found');
+    expect(second.status).toBe('already_completed');
   });
 
   it('expireStale removes entries older than maxAgeMs and writes history', async () => {
@@ -121,7 +121,9 @@ describe('RoomState', () => {
     expect(events).toEqual(['work_started', 'work_expired']);
   });
 
-  it('completeWork after expire returns not_found (entry already moved)', async () => {
+  it('completeWork after expire records expired_then_completed', async () => {
+    const events: string[] = [];
+    state.addSubscriber({ id: 's1', send: (e) => events.push(e.type), close: () => undefined });
     const entry = await state.startWork({
       agentIdentity: { name: 'A', tool: 'T' },
       repo: 'r',
@@ -131,7 +133,30 @@ describe('RoomState', () => {
     });
     now += 100_000;
     state.expireStale(90_000);
+    now += 1_000;
     const out = await state.completeWork(entry.work_id, 'late');
-    expect(out.status).toBe('not_found');
+    expect(out.status).toBe('completed');
+    if (out.status === 'completed') {
+      expect(out.entry.completion_reason).toBe('expired_then_completed');
+      expect(out.entry.summary).toBe('late');
+    }
+    expect(events).toEqual(['work_started', 'work_expired', 'work_completed']);
+    const recent = repo.listRecentlyShipped(ROOM, 10);
+    expect(recent).toHaveLength(1);
+    expect(recent[0]!.completion_reason).toBe('expired_then_completed');
+    expect(recent[0]!.summary).toBe('late');
+  });
+
+  it('completeWork after a fully completed entry returns already_completed', async () => {
+    const entry = await state.startWork({
+      agentIdentity: { name: 'A', tool: 'T' },
+      repo: 'r',
+      branch: null,
+      intent: 'i',
+      files: [],
+    });
+    await state.completeWork(entry.work_id, 'first');
+    const out = await state.completeWork(entry.work_id, 'second');
+    expect(out.status).toBe('already_completed');
   });
 });

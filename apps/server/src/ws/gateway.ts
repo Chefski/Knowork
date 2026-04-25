@@ -8,7 +8,7 @@ import type { RoomRegistry } from '../registry/registry.js';
 import type { Logger } from '../logger.js';
 import type { AppConfig } from '../config.js';
 
-const ROOM_PATH_RE = /^\/ws\/([A-Z2-9]{6})$/;
+const ROOM_PATH_RE = /^\/ws\/([ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6})$/;
 const HEARTBEAT_INTERVAL_MS = 20_000;
 
 export interface GatewayDeps {

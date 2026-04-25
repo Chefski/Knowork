@@ -33,10 +33,17 @@ export type CompleteOutcome =
 export type HeartbeatOutcome = { status: 'ok' } | { status: 'not_found' };
 
 const TOKEN_RE = /[a-z0-9_./-]+/gi;
+const PATH_PART_RE = /[a-z0-9_-]+/gi;
 
 function tokenize(text: string): Set<string> {
   return new Set(
     (text.match(TOKEN_RE) ?? []).map((t) => t.toLowerCase()).filter((t) => t.length > 2),
+  );
+}
+
+function tokenizePath(path: string): Set<string> {
+  return new Set(
+    (path.match(PATH_PART_RE) ?? []).map((t) => t.toLowerCase()).filter((t) => t.length > 2),
   );
 }
 
@@ -76,7 +83,14 @@ export class RoomState {
     return this.mutex.run(() => {
       const entry = this.active.get(workId);
       if (!entry) return { status: 'not_found' };
-      entry.last_seen = this.now();
+      const lastSeen = this.now();
+      entry.last_seen = lastSeen;
+      this.broadcast({
+        type: 'work_heartbeat',
+        room: this.code,
+        work_id: workId,
+        last_seen: lastSeen,
+      });
       return { status: 'ok' };
     });
   }
@@ -84,12 +98,36 @@ export class RoomState {
   completeWork(workId: string, summary: string | null): Promise<CompleteOutcome> {
     return this.mutex.run(() => {
       const entry = this.active.get(workId);
-      if (!entry) return { status: 'not_found' };
+      if (!entry) {
+        const existing = this.repo.getCompletedByWorkId(this.code, workId);
+        if (!existing) return { status: 'not_found' };
+        if (existing.completion_reason !== 'expired') return { status: 'already_completed' };
+
+        const completedAt = this.now();
+        const completed = this.repo.markExpiredThenCompleted(
+          this.code,
+          workId,
+          completedAt,
+          summary,
+        );
+        if (!completed) return { status: 'already_completed' };
+
+        this.repo.touch(this.code, completedAt);
+        this.broadcast({
+          type: 'work_completed',
+          room: this.code,
+          work_id: workId,
+          entry: completed,
+        });
+        return { status: 'completed', entry: completed };
+      }
+
       this.active.delete(workId);
       const completedAt = this.now();
       const completed: CompletedEntry = {
         id: 0,
         room_code: this.code,
+        work_id: workId,
         agent_identity: entry.agent_identity,
         tool: entry.tool,
         repo: entry.repo,
@@ -103,6 +141,7 @@ export class RoomState {
       };
       this.repo.recordCompleted({
         roomCode: this.code,
+        workId,
         agentIdentity: entry.agent_identity,
         tool: entry.tool,
         repo: entry.repo,
@@ -114,9 +153,15 @@ export class RoomState {
         completionReason: 'completed',
         summary,
       });
+      const persisted = this.repo.getCompletedByWorkId(this.code, workId) ?? completed;
       this.repo.touch(this.code, completedAt);
-      this.broadcast({ type: 'work_completed', room: this.code, entry: completed });
-      return { status: 'completed', entry: completed };
+      this.broadcast({
+        type: 'work_completed',
+        room: this.code,
+        work_id: workId,
+        entry: persisted,
+      });
+      return { status: 'completed', entry: persisted };
     });
   }
 
@@ -130,6 +175,7 @@ export class RoomState {
         const completed: CompletedEntry = {
           id: 0,
           room_code: this.code,
+          work_id: workId,
           agent_identity: entry.agent_identity,
           tool: entry.tool,
           repo: entry.repo,
@@ -143,6 +189,7 @@ export class RoomState {
         };
         this.repo.recordCompleted({
           roomCode: this.code,
+          workId,
           agentIdentity: entry.agent_identity,
           tool: entry.tool,
           repo: entry.repo,
@@ -154,11 +201,13 @@ export class RoomState {
           completionReason: 'expired',
           summary: null,
         });
-        expired.push(completed);
+        const persisted = this.repo.getCompletedByWorkId(this.code, workId) ?? completed;
+        expired.push(persisted);
         this.broadcast({
           type: 'work_expired',
           room: this.code,
-          entry: completed,
+          work_id: workId,
+          entry: persisted,
           reason: 'heartbeat_missed',
         });
       }
@@ -172,21 +221,46 @@ export class RoomState {
     const repoLower = args.repo.toLowerCase();
     const branchLower = args.branch?.toLowerCase();
     const intentTokens = args.intent ? tokenize(args.intent) : new Set<string>();
-    const fileSet = new Set((args.files ?? []).map((f) => f.toLowerCase()));
+    const fileTokens = new Set<string>();
+    const filesLower = (args.files ?? []).map((f) => f.toLowerCase());
+    for (const f of filesLower) for (const t of tokenizePath(f)) fileTokens.add(t);
 
     for (const entry of this.active.values()) {
       if (entry.repo.toLowerCase() !== repoLower) continue;
 
       const reasons: string[] = [];
 
-      if (branchLower && entry.branch && entry.branch.toLowerCase() === branchLower) {
-        reasons.push(`same branch (${entry.branch})`);
+      if (branchLower && entry.branch) {
+        const entryBranch = entry.branch.toLowerCase();
+        if (
+          entryBranch === branchLower ||
+          entryBranch.includes(branchLower) ||
+          branchLower.includes(entryBranch)
+        ) {
+          reasons.push(`same branch (${entry.branch})`);
+        }
       }
 
-      if (fileSet.size > 0) {
-        const overlap = entry.files.filter((f) => fileSet.has(f.toLowerCase()));
-        if (overlap.length > 0) {
-          reasons.push(`overlapping file${overlap.length > 1 ? 's' : ''}: ${overlap.join(', ')}`);
+      if (filesLower.length > 0) {
+        const exact = entry.files.filter((f) => filesLower.includes(f.toLowerCase()));
+        if (exact.length > 0) {
+          reasons.push(`overlapping file${exact.length > 1 ? 's' : ''}: ${exact.join(', ')}`);
+        } else if (fileTokens.size > 0) {
+          const fuzzy: string[] = [];
+          for (const f of entry.files) {
+            const entryFileTokens = tokenizePath(f);
+            for (const t of entryFileTokens) {
+              if (fileTokens.has(t)) {
+                fuzzy.push(f);
+                break;
+              }
+            }
+          }
+          if (fuzzy.length > 0) {
+            reasons.push(
+              `related file${fuzzy.length > 1 ? 's' : ''}: ${fuzzy.slice(0, 3).join(', ')}`,
+            );
+          }
         }
       }
 

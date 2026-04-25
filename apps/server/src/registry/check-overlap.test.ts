@@ -70,6 +70,24 @@ describe('RoomState.checkOverlap', () => {
     expect(matches[0]!.reason).toMatch(/same branch/);
   });
 
+  it('matches on substring branch overlap', () => {
+    const matches = state.checkOverlap({
+      repo: 'org/payments',
+      branch: 'feat/auth-cleanup',
+    });
+    expect(matches).toHaveLength(1);
+    expect(matches[0]!.reason).toMatch(/same branch/);
+  });
+
+  it('matches on related (token-overlapping) file paths', () => {
+    const matches = state.checkOverlap({
+      repo: 'org/payments',
+      files: ['src/payments/auth.test.ts'],
+    });
+    expect(matches).toHaveLength(1);
+    expect(matches[0]!.reason).toMatch(/related file/);
+  });
+
   it('returns same-repo signal even when no other dimensions match', () => {
     const matches = state.checkOverlap({
       repo: 'org/payments',

@@ -10,6 +10,7 @@ export interface RoomRow {
 export interface CompletedEntryRow {
   id: number;
   room_code: string;
+  work_id: string | null;
   agent_identity: AgentIdentity;
   tool: string;
   repo: string;
@@ -24,6 +25,7 @@ export interface CompletedEntryRow {
 
 export interface RecordCompletedInput {
   roomCode: string;
+  workId: string | null;
   agentIdentity: AgentIdentity;
   tool: string;
   repo: string;
@@ -45,6 +47,7 @@ interface RawRoomRow {
 interface RawCompletedRow {
   id: number;
   room_code: string;
+  work_id: string | null;
   agent_identity_json: string;
   tool: string;
   repo: string;
@@ -63,26 +66,41 @@ export class Repository {
   private readonly touchRoom;
   private readonly insertCompleted;
   private readonly selectRecent;
+  private readonly selectCompletedByWorkId;
+  private readonly updateExpiredToCompleted;
 
   constructor(private readonly db: Db) {
     this.insertRoom = db.prepare(
       'INSERT INTO rooms (code, created_at, last_active_at) VALUES (?, ?, ?)',
     );
-    this.selectRoom = db.prepare('SELECT code, created_at, last_active_at FROM rooms WHERE code = ?');
+    this.selectRoom = db.prepare(
+      'SELECT code, created_at, last_active_at FROM rooms WHERE code = ?',
+    );
     this.touchRoom = db.prepare('UPDATE rooms SET last_active_at = ? WHERE code = ?');
     this.insertCompleted = db.prepare(`
       INSERT INTO completed_entries (
-        room_code, agent_identity_json, tool, repo, branch, intent, files_json,
+        room_code, work_id, agent_identity_json, tool, repo, branch, intent, files_json,
         started_at, completed_at, completion_reason, summary
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     this.selectRecent = db.prepare(`
-      SELECT id, room_code, agent_identity_json, tool, repo, branch, intent, files_json,
+      SELECT id, room_code, work_id, agent_identity_json, tool, repo, branch, intent, files_json,
              started_at, completed_at, completion_reason, summary
       FROM completed_entries
       WHERE room_code = ?
       ORDER BY completed_at DESC
       LIMIT ?
+    `);
+    this.selectCompletedByWorkId = db.prepare(`
+      SELECT id, room_code, work_id, agent_identity_json, tool, repo, branch, intent, files_json,
+             started_at, completed_at, completion_reason, summary
+      FROM completed_entries
+      WHERE room_code = ? AND work_id = ?
+    `);
+    this.updateExpiredToCompleted = db.prepare(`
+      UPDATE completed_entries
+      SET completed_at = ?, completion_reason = 'expired_then_completed', summary = ?
+      WHERE room_code = ? AND work_id = ? AND completion_reason = 'expired'
     `);
   }
 
@@ -103,6 +121,7 @@ export class Repository {
   recordCompleted(input: RecordCompletedInput): void {
     this.insertCompleted.run(
       input.roomCode,
+      input.workId,
       JSON.stringify(input.agentIdentity),
       input.tool,
       input.repo,
@@ -116,11 +135,32 @@ export class Repository {
     );
   }
 
+  getCompletedByWorkId(roomCode: string, workId: string): CompletedEntryRow | null {
+    const row = this.selectCompletedByWorkId.get(roomCode, workId) as RawCompletedRow | undefined;
+    return row ? this.mapCompletedRow(row) : null;
+  }
+
+  markExpiredThenCompleted(
+    roomCode: string,
+    workId: string,
+    completedAt: number,
+    summary: string | null,
+  ): CompletedEntryRow | null {
+    const result = this.updateExpiredToCompleted.run(completedAt, summary, roomCode, workId);
+    if (result.changes === 0) return null;
+    return this.getCompletedByWorkId(roomCode, workId);
+  }
+
   listRecentlyShipped(roomCode: string, limit: number): CompletedEntryRow[] {
     const rows = this.selectRecent.all(roomCode, limit) as RawCompletedRow[];
-    return rows.map((row) => ({
+    return rows.map((row) => this.mapCompletedRow(row));
+  }
+
+  private mapCompletedRow(row: RawCompletedRow): CompletedEntryRow {
+    return {
       id: row.id,
       room_code: row.room_code,
+      work_id: row.work_id,
       agent_identity: JSON.parse(row.agent_identity_json) as AgentIdentity,
       tool: row.tool,
       repo: row.repo,
@@ -131,6 +171,6 @@ export class Repository {
       completed_at: row.completed_at,
       completion_reason: row.completion_reason as CompletionReason,
       summary: row.summary,
-    }));
+    };
   }
 }

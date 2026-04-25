@@ -1,3 +1,4 @@
+import type { IncomingMessage } from 'node:http';
 import type { Context, MiddlewareHandler } from 'hono';
 import { cors } from 'hono/cors';
 import type { AppConfig } from '../config.js';
@@ -6,7 +7,12 @@ import type { RateLimiter } from '../util/rate-limit.js';
 export function clientIp(c: Context): string {
   const fwd = c.req.header('x-forwarded-for');
   if (fwd) return fwd.split(',')[0]!.trim();
-  return c.req.header('x-real-ip') ?? 'unknown';
+  const realIp = c.req.header('x-real-ip');
+  if (realIp) return realIp;
+  // Fallback for direct Node deployments without a forwarding proxy.
+  // @hono/node-server exposes the raw IncomingMessage as c.env.incoming.
+  const incoming = (c.env as { incoming?: IncomingMessage } | undefined)?.incoming;
+  return incoming?.socket?.remoteAddress ?? 'unknown';
 }
 
 export function rateLimit(limiter: RateLimiter, keyFn: (c: Context) => string): MiddlewareHandler {

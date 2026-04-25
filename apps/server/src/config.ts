@@ -1,9 +1,13 @@
-function envInt(name: string, fallback: number): number {
+function envInt(name: string, fallback: number, opts: { min?: number } = {}): number {
   const raw = process.env[name];
   if (!raw) return fallback;
-  const n = Number.parseInt(raw, 10);
-  if (!Number.isFinite(n)) {
+  if (!/^-?\d+$/.test(raw)) {
     throw new Error(`${name} must be an integer, got ${raw}`);
+  }
+  const n = Number.parseInt(raw, 10);
+  const min = opts.min ?? 1;
+  if (!Number.isFinite(n) || n < min) {
+    throw new Error(`${name} must be an integer >= ${min}, got ${raw}`);
   }
   return n;
 }
@@ -41,10 +45,12 @@ export function loadConfig(): AppConfig {
     throw new Error(`LOG_LEVEL must be one of ${[...VALID_LOG_LEVELS].join(', ')}`);
   }
 
+  const port = envInt('PORT', 8787, { min: 0 });
+
   return {
-    port: envInt('PORT', 8787),
+    port,
     dataDir: envStr('DATA_DIR', './data'),
-    publicBaseUrl: envStr('PUBLIC_BASE_URL', `http://localhost:${envInt('PORT', 8787)}`),
+    publicBaseUrl: envStr('PUBLIC_BASE_URL', `http://localhost:${port}`),
     logLevel: logLevel as AppConfig['logLevel'],
     historyLimit: envInt('HISTORY_LIMIT', 100),
     rateLimitRoomsPerHour: envInt('RATE_LIMIT_ROOMS_PER_HOUR', 10),
