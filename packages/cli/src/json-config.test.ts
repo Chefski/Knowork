@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { applyMcpEntryJson, removeMcpEntryJson } from './json-config.js';
+import {
+  applyMcpEntryJson,
+  applyMcpEntryJsonCustom,
+  removeMcpEntryJson,
+  removeMcpEntryJsonCustom,
+} from './json-config.js';
 import type { McpEntry } from './types.js';
 
 const entry: McpEntry = {
@@ -27,30 +32,27 @@ describe('applyMcpEntryJson', () => {
   });
 
   it('embeds Authorization header when token is present', () => {
-    const out = applyMcpEntryJson(
-      null,
-      { ...entry, token: 'abc123' },
-      { roomCode: ROOM },
-    );
+    const out = applyMcpEntryJson(null, { ...entry, token: 'abc123' }, { roomCode: ROOM });
     const parsed = JSON.parse(out);
     expect(parsed.mcpServers.knowork.headers.Authorization).toBe('Bearer abc123');
     expect(parsed.mcpServers.knowork.headers['X-Room-Code']).toBe(ROOM);
   });
 
   it('does not touch unrelated mcpServers entries', () => {
-    const existing = JSON.stringify(
-      {
-        mcpServers: {
-          'other-server': {
-            type: 'http',
-            url: 'https://other.example.com/mcp',
-            headers: { 'X-Foo': 'bar' },
+    const existing =
+      JSON.stringify(
+        {
+          mcpServers: {
+            'other-server': {
+              type: 'http',
+              url: 'https://other.example.com/mcp',
+              headers: { 'X-Foo': 'bar' },
+            },
           },
         },
-      },
-      null,
-      2,
-    ) + '\n';
+        null,
+        2,
+      ) + '\n';
     const out = applyMcpEntryJson(existing, entry, { roomCode: ROOM });
     const parsed = JSON.parse(out);
     expect(parsed.mcpServers['other-server']).toEqual({
@@ -137,31 +139,88 @@ describe('removeMcpEntryJson', () => {
   });
 
   it('byte-identical round-trip when other entries existed', () => {
-    const original = JSON.stringify(
-      {
-        mcpServers: {
-          'other-server': {
-            type: 'http',
-            url: 'https://other.example.com/mcp',
-            headers: { 'X-Foo': 'bar' },
+    const original =
+      JSON.stringify(
+        {
+          mcpServers: {
+            'other-server': {
+              type: 'http',
+              url: 'https://other.example.com/mcp',
+              headers: { 'X-Foo': 'bar' },
+            },
           },
         },
-      },
-      null,
-      2,
-    ) + '\n';
+        null,
+        2,
+      ) + '\n';
     const applied = applyMcpEntryJson(original, entry, { roomCode: ROOM });
     const removed = removeMcpEntryJson(applied);
     expect(removed).toBe(original);
   });
 
   it('is a no-op when knowork entry is absent', () => {
-    const config = JSON.stringify(
-      { mcpServers: { 'other-server': { type: 'http', url: 'https://x', headers: {} } } },
-      null,
-      2,
-    ) + '\n';
+    const config =
+      JSON.stringify(
+        { mcpServers: { 'other-server': { type: 'http', url: 'https://x', headers: {} } } },
+        null,
+        2,
+      ) + '\n';
     const out = removeMcpEntryJson(config);
     expect(out).toBe(config);
+  });
+});
+
+describe('applyMcpEntryJsonCustom', () => {
+  it('writes VS Code-style servers entries', () => {
+    const out = applyMcpEntryJsonCustom(null, entry, {
+      roomCode: ROOM,
+      containerKey: 'servers',
+      urlField: 'url',
+      typeField: 'type',
+    });
+    const parsed = JSON.parse(out);
+    expect(parsed.servers.knowork).toEqual({
+      type: 'http',
+      url: 'https://knowork.app/mcp',
+      headers: { 'X-Room-Code': ROOM },
+    });
+  });
+
+  it('writes Gemini-style mcpServers entries with httpUrl', () => {
+    const out = applyMcpEntryJsonCustom(null, entry, {
+      roomCode: ROOM,
+      containerKey: 'mcpServers',
+      urlField: 'httpUrl',
+    });
+    const parsed = JSON.parse(out);
+    expect(parsed.mcpServers.knowork).toEqual({
+      httpUrl: 'https://knowork.app/mcp',
+      headers: { 'X-Room-Code': ROOM },
+    });
+  });
+
+  it('preserves unrelated custom-container entries', () => {
+    const original =
+      JSON.stringify(
+        {
+          servers: {
+            memory: {
+              type: 'stdio',
+              command: 'npx',
+              args: ['-y', '@modelcontextprotocol/server-memory'],
+            },
+          },
+        },
+        null,
+        2,
+      ) + '\n';
+    const applied = applyMcpEntryJsonCustom(original, entry, {
+      roomCode: ROOM,
+      containerKey: 'servers',
+      urlField: 'url',
+      typeField: 'type',
+    });
+    const removed = removeMcpEntryJsonCustom(applied, { containerKey: 'servers' });
+    expect(removed).toBe(original);
   });
 });

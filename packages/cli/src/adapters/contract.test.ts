@@ -91,6 +91,9 @@ describe('registry', () => {
     expect(ids).toContain('claude-code');
     expect(ids).toContain('codex-cli');
     expect(ids).toContain('cursor');
+    expect(ids).toContain('gemini-cli');
+    expect(ids).toContain('vscode');
+    expect(ids).toContain('windsurf');
     expect(ids).toContain('manual');
   });
 

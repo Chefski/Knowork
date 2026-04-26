@@ -24,7 +24,7 @@ export async function runCli(argv: string[]): Promise<void> {
     )
     .option(
       '--agent <name>',
-      'Force the adapter (claude-code | codex-cli | cursor | manual). Skips auto-detection.',
+      'Force the adapter (claude-code | codex-cli | cursor | gemini-cli | vscode | windsurf | manual). Skips auto-detection.',
     )
     .option('--password <pw>', 'Password for protected rooms (exchanged for a room token)')
     .option('--project', 'Force project-scope writes (./.mcp.json, ./CLAUDE.md, etc.)')
@@ -56,7 +56,7 @@ export async function runCli(argv: string[]): Promise<void> {
     .description('Remove the Knowork MCP entry and managed rules-file region from this agent.')
     .option(
       '--agent <name>',
-      'Force the adapter (claude-code | codex-cli | cursor | manual). Skips auto-detection.',
+      'Force the adapter (claude-code | codex-cli | cursor | gemini-cli | vscode | windsurf | manual). Skips auto-detection.',
     )
     .option('--project', 'Force project-scope removal')
     .option('--global', 'Force user-scope removal')

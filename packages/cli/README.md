@@ -13,6 +13,9 @@ That writes the right MCP entry to your agent's config and adds the Knowork prot
 - **Claude Code** — `~/.claude/.mcp.json` (global) or `./.mcp.json` (project)
 - **Codex CLI** — `~/.codex/config.toml`
 - **Cursor** — `~/.cursor/mcp.json` (global) or `./.cursor/mcp.json` (project)
+- **Gemini CLI** — `~/.gemini/settings.json` (global) or `./.gemini/settings.json` (project)
+- **VS Code** — user-profile `mcp.json` (global) or `./.vscode/mcp.json` (project)
+- **Windsurf** — `~/.codeium/windsurf/mcp_config.json`
 - **Manual** — prints the snippet for any other agent
 
 The CLI auto-detects which agent invoked it. Override with `--agent <name>`.
@@ -23,7 +26,7 @@ The CLI auto-detects which agent invoked it. Override with `--agent <name>`.
 knowork connect <CODE> [flags]
 
   --server <url>            Knowork server URL (default: $KNOWORK_SERVER or https://knowork.app)
-  --agent <name>            Force adapter (claude-code | codex-cli | cursor | manual)
+  --agent <name>            Force adapter (claude-code | codex-cli | cursor | gemini-cli | vscode | windsurf | manual)
   --password <pw>           Exchange password for a room token, embedded as a Bearer header
   --project / --global      Override scope (default: project inside a git repo, else global)
   --allow-token-in-repo     Permit writing the room token into a git-tracked file

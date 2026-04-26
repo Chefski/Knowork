@@ -1,6 +1,6 @@
 # Knowork
 
-> **Slack status, but for AI coding agents.** Cross-agent, cross-developer, real-time presence and overlap-detection so your team's Claude Code, Codex, and Cursor instances stop quietly duplicating each other's work.
+> **Slack status, but for AI coding agents.** Cross-agent, cross-developer, real-time presence and overlap-detection so your team's Claude Code, Codex, Cursor, Gemini CLI, VS Code, and Windsurf instances stop quietly duplicating each other's work.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
@@ -36,7 +36,7 @@ Open the UI, click **Create new room**, copy the 10-character code.
 npx knowork connect <ROOM-CODE>
 ```
 
-This detects your agent (Claude Code / Codex CLI / Cursor) and writes the right config. Then **restart your agent** to pick it up.
+This detects your agent (Claude Code / Codex CLI / Cursor / Gemini CLI / VS Code / Windsurf) and writes the right config. Then **restart your agent** to pick it up.
 
 Self-hosted? Pass `--server <url>` (e.g. `npx knowork connect <ROOM-CODE> --server https://knowork.example.com`). To revert, run `npx knowork disconnect`.
 
@@ -77,17 +77,57 @@ url = "http://localhost:8787/mcp"
 }
 ```
 
+**Gemini CLI** (`~/.gemini/settings.json` or per-project `.gemini/settings.json`):
+
+```json
+{
+  "mcpServers": {
+    "knowork": {
+      "httpUrl": "http://localhost:8787/mcp",
+      "headers": { "X-Room-Code": "YOUR-CODE" }
+    }
+  }
+}
+```
+
+**VS Code** (user-profile `mcp.json` or per-project `.vscode/mcp.json`):
+
+```json
+{
+  "servers": {
+    "knowork": {
+      "type": "http",
+      "url": "http://localhost:8787/mcp",
+      "headers": { "X-Room-Code": "YOUR-CODE" }
+    }
+  }
+}
+```
+
+**Windsurf** (`~/.codeium/windsurf/mcp_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "knowork": {
+      "serverUrl": "http://localhost:8787/mcp",
+      "headers": { "X-Room-Code": "YOUR-CODE" }
+    }
+  }
+}
+```
+
 After wiring the config, paste the protocol paragraph from this repo's [`CLAUDE.md`](./CLAUDE.md) into your agent's instructions or system prompt so it knows when to call `check_overlap`, `start_work`, and `complete_work`. The room code is passed as a tool argument.
 
 ## MCP tools
 
-| Tool             | Purpose                                                                                  |
-| ---------------- | ---------------------------------------------------------------------------------------- |
-| `check_overlap`  | Read-only — find active work in the room that overlaps with the caller (repo / branch / files / intent keywords). Call before `start_work`. |
-| `start_work`     | Register an active entry. Returns a `work_id`. The entry stays alive automatically while the calling MCP session is connected. |
-| `complete_work`  | Mark the entry shipped (or abandoned) and persist a summary. |
-| `heartbeat`      | **Deprecated** (kept for legacy clients on the stateless transport). Refreshes `last_seen`. New agents do not need to call this — presence is automatic while the MCP session is open. |
-| `list_active`    | Read-only — list every active entry in the room. |
+| Tool            | Purpose                                                                                                                                                                                |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `check_overlap` | Read-only — find active work in the room that overlaps with the caller (repo / branch / files / intent keywords). Call before `start_work`.                                            |
+| `start_work`    | Register an active entry. Returns a `work_id`. The entry stays alive automatically while the calling MCP session is connected.                                                         |
+| `complete_work` | Mark the entry shipped (or abandoned) and persist a summary.                                                                                                                           |
+| `heartbeat`     | **Deprecated** (kept for legacy clients on the stateless transport). Refreshes `last_seen`. New agents do not need to call this — presence is automatic while the MCP session is open. |
+| `list_active`   | Read-only — list every active entry in the room.                                                                                                                                       |
 
 ## CLI flags
 
@@ -98,25 +138,25 @@ After wiring the config, paste the protocol paragraph from this repo's [`CLAUDE.
 - `--password <pw>` — exchange password for room token, embed as Bearer
 - `--global` — write to user-scope (`~/.claude/...`) instead of project
 - `--project` — force project-scope
-- `--agent <name>` — force adapter (`claude-code` | `codex-cli` | `cursor` | `manual`)
+- `--agent <name>` — force adapter (`claude-code` | `codex-cli` | `cursor` | `gemini-cli` | `vscode` | `windsurf` | `manual`)
 - `--allow-token-in-repo` — permit writing the room token into a tracked file
 
 ## Environment variables
 
-| Variable           | Default                  | Description                                        |
-| ------------------ | ------------------------ | -------------------------------------------------- |
-| `PORT`             | `8787`                   | HTTP/WebSocket port                                |
-| `DATA_DIR`         | `./data`                 | Where SQLite lives. Use `:memory:` for tests.      |
-| `PUBLIC_BASE_URL`  | `http://localhost:8787`  | Public URL — used for share links and MCP discovery |
-| `LOG_LEVEL`        | `info`                   | `trace` / `debug` / `info` / `warn` / `error`      |
-| `HISTORY_LIMIT`    | `100`                    | Recently-shipped entries kept per room             |
-| `RATE_LIMIT_ROOMS_PER_HOUR` | `10`            | Room creations per IP per hour                     |
-| `RATE_LIMIT_WRITES_PER_MIN` | `60`            | Write tool calls per IP per room per minute        |
-| `DISCONNECT_GRACE_MS`       | `30000`         | Window after MCP session close during which entries can resume on reconnect with the same session ID before they finalize as `session_closed` |
-| `SESSION_MAX_AGE_MS`        | `86400000`      | Hard cap (default 24h) on any active entry's age, regardless of session connectivity. Backstop against zombie sessions |
-| `HEARTBEAT_EXPIRY_MS`       | `90000`         | Legacy stateless-fallback only — wall-clock window for entries created without an MCP session. No effect on session-bound entries |
-| `SWEEP_INTERVAL_MS`         | `15000`         | How often the registry runs its sweep (max-age + legacy heartbeat) |
-| `SSE_REPLAY_BUFFER_SIZE`    | `1024`          | Per-stream cap on SSE events retained for `Last-Event-ID` resumption. Bumps memory roughly linearly with the number of concurrent sessions |
+| Variable                    | Default                 | Description                                                                                                                                   |
+| --------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PORT`                      | `8787`                  | HTTP/WebSocket port                                                                                                                           |
+| `DATA_DIR`                  | `./data`                | Where SQLite lives. Use `:memory:` for tests.                                                                                                 |
+| `PUBLIC_BASE_URL`           | `http://localhost:8787` | Public URL — used for share links and MCP discovery                                                                                           |
+| `LOG_LEVEL`                 | `info`                  | `trace` / `debug` / `info` / `warn` / `error`                                                                                                 |
+| `HISTORY_LIMIT`             | `100`                   | Recently-shipped entries kept per room                                                                                                        |
+| `RATE_LIMIT_ROOMS_PER_HOUR` | `10`                    | Room creations per IP per hour                                                                                                                |
+| `RATE_LIMIT_WRITES_PER_MIN` | `60`                    | Write tool calls per IP per room per minute                                                                                                   |
+| `DISCONNECT_GRACE_MS`       | `30000`                 | Window after MCP session close during which entries can resume on reconnect with the same session ID before they finalize as `session_closed` |
+| `SESSION_MAX_AGE_MS`        | `86400000`              | Hard cap (default 24h) on any active entry's age, regardless of session connectivity. Backstop against zombie sessions                        |
+| `HEARTBEAT_EXPIRY_MS`       | `90000`                 | Legacy stateless-fallback only — wall-clock window for entries created without an MCP session. No effect on session-bound entries             |
+| `SWEEP_INTERVAL_MS`         | `15000`                 | How often the registry runs its sweep (max-age + legacy heartbeat)                                                                            |
+| `SSE_REPLAY_BUFFER_SIZE`    | `1024`                  | Per-stream cap on SSE events retained for `Last-Event-ID` resumption. Bumps memory roughly linearly with the number of concurrent sessions    |
 
 ## Deployment behind a load balancer
 

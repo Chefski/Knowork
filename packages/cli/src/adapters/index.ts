@@ -1,7 +1,10 @@
 import { claudeCodeAdapter } from './claude-code.js';
 import { codexCliAdapter } from './codex-cli.js';
 import { cursorAdapter } from './cursor.js';
+import { geminiCliAdapter } from './gemini-cli.js';
 import { manualAdapter } from './manual.js';
+import { vscodeAdapter } from './vscode.js';
+import { windsurfAdapter } from './windsurf.js';
 import type { AgentAdapter } from './types.js';
 
 // Order matters for detection iteration: claude-code first because it's the
@@ -10,6 +13,9 @@ export const ALL_ADAPTERS: AgentAdapter[] = [
   claudeCodeAdapter,
   codexCliAdapter,
   cursorAdapter,
+  geminiCliAdapter,
+  vscodeAdapter,
+  windsurfAdapter,
   manualAdapter,
 ];
 
