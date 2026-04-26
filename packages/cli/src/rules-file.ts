@@ -1,7 +1,7 @@
 import {
   KNOWORK_RULES_END_MARKER,
   KNOWORK_RULES_START_MARKER,
-} from '@apb/shared';
+} from './protocol-text.js';
 
 export function applyRulesBlock(existing: string | null, block: string): string {
   if (existing === null) {

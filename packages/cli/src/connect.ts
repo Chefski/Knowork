@@ -1,5 +1,4 @@
 import { consola } from 'consola';
-import { knoworkRulesBlock } from '@apb/shared';
 import { CliError } from './errors.js';
 import { normalizeRoomCode } from './room-code.js';
 import { detectAdapter } from './detect.js';
@@ -9,6 +8,7 @@ import { ServerClient } from './server-client.js';
 import { applyPlannedWrites, isPathInsideGitTree, readIfExists } from './file-batch.js';
 import { applyRulesBlock } from './rules-file.js';
 import { renderPlannedWrites } from './diff.js';
+import { knoworkRulesBlock } from './protocol-text.js';
 import type { ConnectOptions, McpEntry, PlannedWrite, ResolvedScope } from './types.js';
 import type { AgentAdapter } from './adapters/types.js';
 
@@ -69,12 +69,16 @@ export async function connect(opts: ConnectOptions): Promise<void> {
     return;
   }
 
-  if (plans.every((p) => p.before === p.after)) {
+  const writablePlans = plans.filter((p) => !p.path.startsWith('<'));
+  const changedWritablePlans = writablePlans.filter((p) => p.before !== p.after);
+  const manualSnippet = plans.find((p) => p.path.startsWith('<') && p.after !== null);
+
+  if (changedWritablePlans.length === 0 && !manualSnippet) {
     consola.info('Already connected — nothing to write.');
     return;
   }
 
-  applyPlannedWrites(plans);
+  applyPlannedWrites(writablePlans);
   printConnectSummary(plans, adapter, roomCode, scope);
 }
 

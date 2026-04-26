@@ -3,7 +3,7 @@ import {
   KNOWORK_RULES_END_MARKER,
   KNOWORK_RULES_START_MARKER,
   knoworkRulesBlock,
-} from '@apb/shared';
+} from './protocol-text.js';
 import { applyRulesBlock, removeRulesBlock } from './rules-file.js';
 
 const block = knoworkRulesBlock();

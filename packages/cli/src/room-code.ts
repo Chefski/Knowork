@@ -1,8 +1,9 @@
-import { ROOM_CODE_LENGTH, ROOM_CODE_PATTERN } from '@apb/shared';
 import { CliError } from './errors.js';
 
-// The shared pattern is the single source of truth (see
-// packages/shared/src/schemas.ts) — we don't duplicate the alphabet here.
+// Keep this in sync with packages/shared/src/schemas.ts. The CLI package is
+// published standalone, so it cannot import private workspace-only packages.
+const ROOM_CODE_PATTERN = /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]+$/;
+const ROOM_CODE_LENGTH = 10;
 
 const REMEDIATION = 'Copy the code from the room URL or the web UI header.';
 

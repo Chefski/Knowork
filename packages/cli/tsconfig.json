@@ -8,5 +8,5 @@
     "types": ["node"]
   },
   "include": ["src/**/*"],
-  "references": [{ "path": "../shared" }]
+  "exclude": ["src/**/*.test.ts"]
 }
