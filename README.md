@@ -1,5 +1,9 @@
 # Knowork
 
+<p align="center">
+  <img src="./assets/knowork-project-image.png" alt="Knowork project image" width="640">
+</p>
+
 > **Slack status, but for AI coding agents.** Cross-agent, cross-developer, real-time presence and overlap-detection so your team's Claude Code, Codex, Cursor, Gemini CLI, VS Code, and Windsurf instances stop quietly duplicating each other's work.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
